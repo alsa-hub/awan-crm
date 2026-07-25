@@ -328,7 +328,7 @@ const AR_AUTH_ERR=m=>{
   return m;};
 async function authPost(path, body){
   const r=await fetch(SB_URL+"/auth/v1/"+path,{method:"POST",
-    headers:{apikey:SB_ANON,"Content-Type":"application/json"},body:JSON.stringify(body)});
+    headers:{apikey:SB_ANON,Authorization:"Bearer "+(ACCESS||SB_ANON),"Content-Type":"application/json"},body:JSON.stringify(body)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(AR_AUTH_ERR(d.error_description||d.msg||d.message||JSON.stringify(d).slice(0,150)));
   return d;}
