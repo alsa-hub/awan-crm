@@ -280,7 +280,7 @@ const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},
                set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 
 /* ================= حالة ================= */
-let ACC=[], DEALS=[], ACTS=[], REVS=[];
+let ACC=[], DEALS=[], ACTS=[], REVS=[], USERS=[];
 let accFilter="الكل", todayFilter="الكل";
 
 /* ================= REST ================= */
@@ -362,7 +362,9 @@ async function loadAll(){
     api("crm_reviews?select=*&limit=1000")
   ]);
   ACC=a||[]; DEALS=d||[]; ACTS=ac||[]; REVS=rv||[];
+  USERS = ME?.role==="admin" ? (await api("app_users?select=id,email,full_name,role,status&order=created_at").catch(()=>[])) : (ME?[ME]:[]);
 }
+const userName=id=>{const u=USERS.find(x=>x.id===id);return u?(u.full_name||u.email.split("@")[0]):null};
 
 /* ================= أدوات ================= */
 const $=id=>document.getElementById(id);
@@ -394,7 +396,7 @@ function renderToday(){
     .filter(a=>todayFilter==="الكل"||a.priority===todayFilter)
     .sort((a,b)=>(PRIOS.indexOf(a.priority??9)-PRIOS.indexOf(b.priority??9))||((b.reviews_count||0)-(a.reviews_count||0)))
     .slice(0,30);
-  $("todaySub").textContent=`${leads.length} حساب جاهز للتواصل — مرتب حسب الأولوية ثم الحركة`;
+  $("todaySub").textContent=`${leads.length} حساب جاهز للتواصل${ME?.role==="rep"?" — حساباتك المسندة لك":""} — مرتب حسب الأولوية`;
   $("queue").innerHTML=leads.length?leads.map(a=>{
     const angle=a.notes?`<div class="angle"><b>الزاوية:</b> ${esc(a.notes)}</div>`:"";
     const dl=DEALS.find(d=>d.account_id==a.id&&!["won","lost","frozen"].includes(d.stage));
@@ -446,11 +448,12 @@ function renderDash(){
 
 /* ================= الحسابات ================= */
 function renderAccounts(){
-  const chips=["الكل",...PRIOS,"عملاء","مستبعد"];
+  const chips=["الكل",...PRIOS,"عملاء","مستبعد",...(ME?.role==="admin"?["غير مسنّد"]:[])];
   $("accChips").innerHTML=chips.map(c=>`<button class="chip ${accFilter===c?"on":""}" onclick="accFilter='${c}';renderAccounts()">${c}</button>`).join("");
   const q=($("accSearch").value||"").trim();
   let list=ACC.filter(a=>{
     if(accFilter==="مستبعد")return !!a.exclusion_reason||a.status==="excluded";
+    if(accFilter==="غير مسنّد")return isOpenAcc(a)&&!a.assigned_to;
     if(!isOpenAcc(a))return false;
     if(accFilter==="عملاء")return a.status==="customer"||DEALS.some(d=>d.account_id==a.id&&d.stage==="won");
     if(PRIOS.includes(accFilter))return a.priority===accFilter;
@@ -463,7 +466,7 @@ function renderAccounts(){
     const tag=a.exclusion_reason?`<span class="tag t-x">مستبعد</span>`:cust?`<span class="tag t-cust">عميل</span>`:`<span class="tag t-lead">${a.status==="contacted"?"تم التواصل":"فرصة"}</span>`;
     return `<div class="row" onclick="openAcc(${a.id})">
       <div class="grow"><div class="nm">${esc(a.name_ar)}</div>
-      <div class="mt">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span></div></div>
+      <div class="mt">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span>${ME?.role==="admin"?` · ${a.assigned_to?"👤 "+esc(userName(a.assigned_to)||"?"):"<span style=\'color:var(--amber)\'>غير مسنّد</span>"}`:""}</div></div>
       ${tag}${beans(a.priority)}</div>`;
   }).join("")||`<div class="empty"><div class="big">🔍</div>لا نتائج مطابقة</div>`;
 }
@@ -486,6 +489,11 @@ function openAcc(id){
       ${a.google_maps_url?`<a class="btn b-ghost b-sm" target="_blank" href="${esc(a.google_maps_url)}">الخريطة</a>`:""}
       ${a.website?`<a class="btn b-ghost b-sm" target="_blank" href="${esc(a.website)}">الموقع</a>`:""}
     </div>
+    ${ME?.role==="admin"?`<div class="sh-sec">المسؤول عن الحساب</div>
+      <select class="sel" onchange="assignAccount(${a.id},this.value)">
+        <option value="">— غير مسنّد —</option>
+        ${USERS.filter(u=>u.status==="approved").map(u=>`<option value="${u.id}" ${a.assigned_to===u.id?"selected":""}>${esc(u.full_name||u.email)} ${u.role==="admin"?"(مدير)":""}</option>`).join("")}
+      </select>`:""}
     ${a.notes?`<div class="sh-sec">الزاوية البيعية</div><div class="q p-${a.priority||""}" style="margin:0"><div class="angle" style="margin:0">${esc(a.notes)}</div></div>`:""}
     ${revs.length?`<div class="sh-sec">مراجعات قوقل المرصودة</div>`+revs.map(r=>`
       <div class="rev ${r.rating<=2?"bad":r.rating>=4?"good":""}">«${esc(r.excerpt)}»
@@ -531,6 +539,14 @@ async function logResult(id,i){
     closeSheet(); toast("سُجّلت النتيجة والمتابعة ✅"); renderToday();
   }catch(e){toast("تعذر الحفظ: "+e.message)}
 }
+async function assignAccount(accId,uid){
+  const a=accById(accId); const old=a.assigned_to;
+  a.assigned_to=uid||null;
+  try{
+    await api(`crm_accounts?id=eq.${accId}`,{method:"PATCH",body:JSON.stringify({assigned_to:uid||null})});
+    toast(uid?`أُسند إلى ${userName(uid)} ✅`:"أُلغي الإسناد");
+    if(document.getElementById("scr-acc").classList.contains("on"))renderAccounts();
+  }catch(e){a.assigned_to=old; toast("تعذر الإسناد: "+e.message)}}
 async function newDeal(id){
   const kg=prompt("الكمية الشهرية المتوقعة بالكيلو؟","60"); if(kg===null)return;
   const row={account_id:id,stage:"new",expected_monthly_kg:+kg||0,probability:20};
@@ -664,7 +680,8 @@ async function renderAdmin(){
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="flex:1;min-width:0"><b>${esc(u.full_name||u.email.split("@")[0])}</b>
           <div class="mini" dir="ltr" style="text-align:right">${esc(u.email)}</div></div>
-        <span class="tag ${stCls}">${stTxt}</span><span class="tag t-lead">${ROLE[u.role]||u.role}</span></div>
+        <span class="tag ${stCls}">${stTxt}</span><span class="tag t-lead">${ROLE[u.role]||u.role}</span>
+        <span class="tag t-cust num">${ACC.filter(a=>a.assigned_to===u.id).length} حساب</span></div>
       <div class="acts" style="margin-top:10px">
         ${u.status!=="approved"?`<button class="btn b-wa b-sm" onclick="adminOp('approve','${u.id}')">اعتماد ✓</button>`:""}
         ${u.status==="approved"&&!self?`<button class="btn b-red b-sm" onclick="adminOp('disable','${u.id}')">إيقاف</button>`:""}
