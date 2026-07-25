@@ -33,7 +33,7 @@ header{
 .brand{display:flex; align-items:baseline; gap:8px}
 .brand .logo{font-family:"Reem Kufi"; font-weight:700; font-size:26px; letter-spacing:.5px; color:#F0DFBF}
 .brand small{font-size:11.5px; color:#C9B594; font-weight:500}
-#connBadge{margin-inline-start:auto; font-size:11px; padding:4px 10px; border-radius:99px;
+#connBadge{ font-size:11px; padding:4px 10px; border-radius:99px;
   background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#D8C5A2; cursor:pointer}
 #connBadge.live{background:rgba(62,122,94,.25); border-color:#4c8f70; color:#BFE3D2}
 /* ---------- Nav ---------- */
@@ -148,6 +148,13 @@ input.search:focus,textarea.ta:focus,input.inp:focus{border-color:var(--amber)}
   #sheet{right:auto; left:24px; bottom:24px; width:430px; border-radius:18px; max-height:82dvh}
   #sheet:not(.on){transform:translateY(20px); opacity:0; pointer-events:none}
   #sheet{transition:.2s}
+  body{padding-bottom:30px}
+  nav{top:76px; bottom:auto; right:max(12px,calc((100vw - 1240px)/2)); left:auto; width:88px;
+    flex-direction:column; gap:4px; border-radius:16px; padding:10px 6px; border:1px solid #4a341f}
+  nav button{width:100%; padding:10px 4px}
+  main{max-width:1100px; padding-inline-end:120px}
+  #queue,.twocol{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start}
+  .q{margin-bottom:0}
 }
 .sh-name{font-size:18px; font-weight:700}
 .sh-meta{font-size:12px; color:var(--muted); margin:2px 0 12px}
@@ -176,6 +183,7 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
 <body>
 <header>
   <div class="brand"><span class="logo">أوان</span><small>منظومة مبيعات البن — الرياض</small></div>
+  <button id="refreshBtn" onclick="refreshData()" title="تحديث البيانات" style="margin-inline-start:auto;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#D8C5A2;border-radius:99px;width:30px;height:30px;cursor:pointer;font-size:14px;line-height:1">⟳</button>
   <span id="connBadge" onclick="openSetup()">غير متصل</span>
 </header>
 
@@ -367,12 +375,14 @@ function renderToday(){
   $("todaySub").textContent=`${leads.length} حساب جاهز للتواصل — مرتب حسب الأولوية ثم الحركة`;
   $("queue").innerHTML=leads.length?leads.map(a=>{
     const angle=a.notes?`<div class="angle"><b>الزاوية:</b> ${esc(a.notes)}</div>`:"";
+    const dl=DEALS.find(d=>d.account_id==a.id&&!["won","lost","frozen"].includes(d.stage));
+    const dealTag=dl?`<div style="margin-top:7px;font-size:11px;color:var(--green);font-weight:700">● صفقة ${STAGE_AR[dl.stage]} — <span class="num">${dl.expected_monthly_kg||0}</span> كغ/شهر</div>`:"";
     return `<div class="q p-${a.priority||""}">
       <div class="top"><div style="flex:1;min-width:0">
         <div class="name">${esc(a.name_ar)}</div>
         <div class="meta">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span></div>
       </div>${beans(a.priority)}</div>
-      ${angle}
+      ${angle}${dealTag}
       <div class="acts">
         <a class="btn b-call b-sm" href="tel:${digits(a.phone)}"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 5.18 2 2 0 0 1 5.06 3h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>اتصال</a>
         <a class="btn b-wa b-sm" target="_blank" href="https://wa.me/${waNum(a.phone)}">واتساب</a>
@@ -479,8 +489,8 @@ function quickLog(id){
               ["غير مهتم حالياً","إعادة المحاولة بعد شهر",30]];
   openSheet(`<div class="sh-name">نتيجة التواصل — ${esc(a.name_ar)}</div>
     <div class="sh-meta">اختر النتيجة وستُسجَّل مع متابعة تلقائية</div>
-    <div class="frm">${opts.map((o,i)=>`<button class="btn ${i===0?"b-call":"b-ghost"}" style="justify-content:center" onclick="logResult(${id},${i})">${o[0]}</button>`).join("")}
-    <textarea class="ta" id="logNote" rows="2" placeholder="ملاحظة إضافية (اختياري)…"></textarea></div>`);
+    <div class="frm"><textarea class="ta" id="logNote" rows="2" placeholder="ملاحظة (اختياري) — اكتبها أولاً ثم اختر النتيجة…"></textarea>
+    ${opts.map((o,i)=>`<button class="btn ${i===0?"b-call":"b-ghost"}" style="justify-content:center" onclick="logResult(${id},${i})">${o[0]}</button>`).join("")}</div>`);
   window._opts=opts;
 }
 async function logResult(id,i){
@@ -544,16 +554,23 @@ function renderTasks(){
   const t0=today0();
   const list=ACTS.filter(x=>x.next_action&&x.next_action_date)
     .sort((a,b)=>new Date(a.next_action_date)-new Date(b.next_action_date)).slice(0,60);
+  const grp=x=>{const d=new Date(x.next_action_date); return d<t0?"🔥 متأخر":(d-t0<864e5?"اليوم":"قادم")};
+  let cur=null;
   $("tasks").innerHTML=list.length?list.map(x=>{
-    const a=accById(x.account_id); const late=new Date(x.next_action_date)<t0;
+    const g=grp(x); const head=g!==cur?`<div class="sh-sec" style="margin-top:16px">${g}</div>`:""; cur=g;
+    return head+taskRow(x)}).join("")
+    :`<div class="empty"><div class="big">✅</div>لا متابعات معلّقة — القائمة نظيفة</div>`;
+}
+function taskRow(x){
+  {
+    const a=accById(x.account_id); const late=new Date(x.next_action_date)<today0();
     return `<div class="task ${late?"late":""}">
       <div style="flex:1"><div class="tt">${esc(x.next_action)}</div>
         <div class="td">${esc(a.name_ar||"")} · ${fmtD(x.next_action_date)}</div></div>
       <div class="done acts">
         <button class="btn b-ghost b-sm" onclick="openAcc(${x.account_id})">البطاقة</button>
         <button class="btn b-wa b-sm" onclick="taskDone(${x.id??"null"},${x.account_id})">تم ✓</button>
-      </div></div>`}).join("")
-    :`<div class="empty"><div class="big">✅</div>لا متابعات معلّقة — القائمة نظيفة</div>`;
+      </div></div>`}
 }
 async function taskDone(id,accId){
   try{
@@ -564,6 +581,15 @@ async function taskDone(id,accId){
 }
 
 /* ================= إقلاع ================= */
+async function refreshData(){
+  const b=$("refreshBtn"); b.style.transform="rotate(360deg)"; b.style.transition="transform .6s";
+  setTimeout(()=>{b.style.transform="";b.style.transition=""},650);
+  if(DEMO){toast("وضع تجريبي — لا توجد قاعدة للتحديث منها");return}
+  try{await loadAll(); toast("تحدّثت البيانات ⟳");
+    const on=document.querySelector("nav button.on");
+    go(on?.dataset.s||"today",on);
+  }catch(e){toast("تعذر التحديث: "+e.message)}
+}
 function openSetup(){$("setup").classList.add("on"); if(SB_KEY)$("keyIn").value=SB_KEY}
 async function saveKey(){
   const k=$("keyIn").value.trim(); if(!k){toast("الصق المفتاح أولاً");return}
