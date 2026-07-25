@@ -136,6 +136,26 @@ input.search:focus,textarea.ta:focus,input.inp:focus{border-color:var(--amber)}
 .bar .vv{color:var(--muted); text-align:left}
 .legend{display:flex; flex-wrap:wrap; gap:10px; font-size:11.5px; color:var(--muted); margin-top:8px}
 .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-inline-end:4px}
+/* ---------- Team dashboard ---------- */
+.trow{display:grid; grid-template-columns:1fr auto auto auto auto; gap:8px; align-items:center;
+  padding:9px 4px; border-bottom:1px solid var(--line); font-size:12.5px}
+.trow:last-child{border-bottom:0}
+.trow.head{font-size:10.5px; color:var(--muted); font-weight:700; border-bottom:2px solid var(--gold-line); padding-bottom:6px}
+.trow .cell{text-align:center; min-width:44px}
+.trow .who{font-weight:700; display:flex; align-items:center; gap:7px; min-width:0}
+.avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(140deg,var(--roast),var(--amber));color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:0 0 auto}
+.trow .who span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{font-size:11px;font-weight:700;border-radius:8px;padding:2px 8px;display:inline-block;min-width:30px}
+.pill.g{background:var(--green-soft);color:var(--green)} .pill.a{background:var(--amber-soft);color:#8a5f22}
+.pill.r{background:var(--red-soft);color:var(--red)} .pill.n{background:#efe7d7;color:var(--muted)}
+.feed{border-inline-start:2px solid var(--line); margin-inline-start:12px; padding-inline-start:16px}
+.fitem{position:relative; padding-bottom:13px; font-size:12.8px}
+.fitem::before{content:""; position:absolute; inset-inline-start:-22px; top:4px; width:10px; height:10px;
+  border-radius:50%; background:var(--amber); border:2px solid var(--card)}
+.fitem:last-child{padding-bottom:2px}
+.fitem .fw{font-weight:700; color:var(--roast-deep)}
+.fitem .ft{font-size:10.5px; color:var(--muted); margin-top:1px}
 /* ---------- Sheet (bottom modal) ---------- */
 #ovl{position:fixed; inset:0; background:rgba(32,20,9,.45); z-index:80; display:none}
 #ovl.on{display:block}
@@ -201,6 +221,8 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
   <h2 class="scr">اللوحة</h2>
   <div class="sub" id="dashDate"></div>
   <div class="kpis" id="kpis"></div>
+  <div class="card" id="teamCard" style="display:none"><h3>أداء الفريق — آخر ٧ أيام</h3><div id="teamPerf"></div></div>
+  <div class="card"><h3>آخر النشاط</h3><div class="feed" id="actFeed"></div></div>
   <div class="card"><h3>خط الصفقات (كغ/شهر)</h3><div class="bars" id="chPipe"></div></div>
   <div class="card"><h3>الحسابات حسب الأولوية</h3><div class="bars" id="chPrio"></div></div>
   <div class="card"><h3>أعلى الأحياء (عدد الحسابات المفتوحة)</h3><div class="bars" id="chDist"></div></div>
@@ -440,12 +462,51 @@ function renderDash(){
   const prm=Math.max(...pr.map(x=>x.v),1);
   const pc={"قصوى":"var(--p1)","مرتفعة":"var(--p2)","متوسطة":"var(--p3)","منخفضة":"var(--p4)"};
   $("chPrio").innerHTML=pr.map(x=>bar(x.p,x.v,prm,pc[x.p])).join("");
+  renderTeam(); renderFeed();
   const dm={}; ACC.filter(isOpenAcc).forEach(a=>{if(a.district)dm[a.district]=(dm[a.district]||0)+1});
   const ds=Object.entries(dm).sort((a,b)=>b[1]-a[1]).slice(0,7);
   const dmx=Math.max(...ds.map(x=>x[1]),1);
   $("chDist").innerHTML=ds.map(([k,v])=>bar(k,v,dmx)).join("")||`<div class="mini">لا توجد بيانات أحياء</div>`;
 }
 
+const timeAgo=d=>{if(!d)return"";const s=(Date.now()-new Date(d))/1e3;
+  if(s<60)return"الآن"; if(s<3600)return`قبل ${Math.floor(s/60)} د`;
+  if(s<86400)return`قبل ${Math.floor(s/3600)} س`; if(s<172800)return"أمس";
+  return`قبل ${Math.floor(s/86400)} يوم`};
+const ACT_AR={call:"مكالمة",whatsapp:"واتساب",visit:"زيارة",note:"ملاحظة"};
+function renderTeam(){
+  if(ME?.role!=="admin"){$("teamCard").style.display="none";return}
+  $("teamCard").style.display="block";
+  const wk=7*864e5, t0=today0();
+  const accOwner={}; ACC.forEach(a=>{if(a.assigned_to)accOwner[a.id]=a.assigned_to});
+  const rows=USERS.filter(u=>u.status==="approved").map(u=>{
+    const acts7=ACTS.filter(x=>x.created_by===u.id&&x.created_at&&(Date.now()-new Date(x.created_at))<wk).length;
+    const myAccs=ACC.filter(a=>a.assigned_to===u.id).map(a=>a.id);
+    const openKg=openDeals().filter(d=>myAccs.includes(d.account_id)).reduce((s,d)=>s+(+d.expected_monthly_kg||0),0);
+    const late=ACTS.filter(x=>x.created_by===u.id&&x.next_action_date&&new Date(x.next_action_date)<t0).length;
+    return{u,acts7,openKg,late,accs:myAccs.length};
+  }).sort((a,b)=>b.acts7-a.acts7);
+  const init=n=>(n||"؟").trim()[0]||"؟";
+  $("teamPerf").innerHTML=`<div class="trow head"><span>المندوب</span><span class="cell">نشاط</span><span class="cell">حسابات</span><span class="cell">خط كغ</span><span class="cell">متأخر</span></div>`
+  + rows.map(r=>`<div class="trow">
+      <span class="who"><span class="avatar">${esc(init(r.u.full_name||r.u.email))}</span><span>${esc(r.u.full_name||r.u.email.split("@")[0])}${r.u.role==="admin"?" ⭐":""}</span></span>
+      <span class="cell"><span class="pill ${r.acts7>0?"g":"n"} num">${r.acts7}</span></span>
+      <span class="cell"><span class="pill n num">${r.accs}</span></span>
+      <span class="cell"><span class="pill a num">${Math.round(r.openKg)}</span></span>
+      <span class="cell"><span class="pill ${r.late?"r":"n"} num">${r.late}</span></span>
+    </div>`).join("")||`<div class="mini">لا أعضاء معتمدون بعد</div>`;
+}
+function renderFeed(){
+  const list=[...ACTS].filter(x=>x.created_at)
+    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,8);
+  $("actFeed").innerHTML=list.map(x=>{
+    const who=ME?.role==="admin"?(userName(x.created_by)||"—"):"";
+    const acc=accById(x.account_id).name_ar||"";
+    return `<div class="fitem"><span class="fw">${who?esc(who)+" · ":""}${ACT_AR[x.activity_type]||esc(x.activity_type||"نشاط")}</span>
+      — ${esc((x.notes||"").slice(0,70))}
+      <div class="ft">${esc(acc)} · ${timeAgo(x.created_at)}</div></div>`;
+  }).join("")||`<div class="mini">لا نشاط مسجل بعد — أول مكالمة تسجلها تظهر هنا</div>`;
+}
 /* ================= الحسابات ================= */
 function renderAccounts(){
   const chips=["الكل",...PRIOS,"عملاء","مستبعد",...(ME?.role==="admin"?["غير مسنّد"]:[])];
