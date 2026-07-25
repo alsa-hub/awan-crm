@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>أوان — منظومة المبيعات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5EFE4; --card:#FFFDF9; --ink:#2A1E14; --muted:#8D7B69; --line:#E7DCCA;
+  --roast:#6F4425; --roast-deep:#3B2415; --amber:#C98A3B; --amber-soft:#F3E3C8;
+  --green:#3E7A5E; --green-soft:#E3EFE8; --red:#B4442F; --red-soft:#F6E3DE;
+  --dark:#201409; --gold-line:#D9B97F;
+  --p1:#2A1B10; --p2:#6F4425; --p3:#A9713D; --p4:#D5AE7E;
+  --r:14px; --shadow:0 1px 2px rgba(42,30,20,.06),0 6px 18px rgba(42,30,20,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink); font-size:15px; line-height:1.55;
+  min-height:100dvh; padding-bottom:calc(72px + env(safe-area-inset-bottom));
+}
+.num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
+/* ---------- Header ---------- */
+header{
+  background:linear-gradient(160deg,#241609 0%,#3B2415 70%,#4a2e1a 100%);
+  color:#F3E8D5; padding:14px 18px 12px; position:sticky; top:0; z-index:40;
+  display:flex; align-items:center; gap:12px;
+  border-bottom:2px solid var(--gold-line);
+}
+.brand{display:flex; align-items:baseline; gap:8px}
+.brand .logo{font-family:"Reem Kufi"; font-weight:700; font-size:26px; letter-spacing:.5px; color:#F0DFBF}
+.brand small{font-size:11.5px; color:#C9B594; font-weight:500}
+#connBadge{margin-inline-start:auto; font-size:11px; padding:4px 10px; border-radius:99px;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#D8C5A2; cursor:pointer}
+#connBadge.live{background:rgba(62,122,94,.25); border-color:#4c8f70; color:#BFE3D2}
+/* ---------- Nav ---------- */
+nav{
+  position:fixed; bottom:0; right:0; left:0; z-index:50;
+  background:rgba(32,20,9,.97); backdrop-filter:blur(8px);
+  display:flex; justify-content:space-around;
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  border-top:1px solid #4a341f;
+}
+nav button{
+  background:none; border:0; color:#9d8a70; font-family:inherit; font-size:10.5px;
+  display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 10px;
+  border-radius:10px; cursor:pointer; min-width:58px;
+}
+nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:#F0DFBF; background:rgba(201,138,59,.16)}
+main{max-width:1060px; margin:0 auto; padding:16px 14px 30px}
+.screen{display:none} .screen.on{display:block; animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+h2.scr{font-size:19px; font-weight:700; margin:2px 0 2px}
+.sub{color:var(--muted); font-size:12.5px; margin-bottom:14px}
+/* ---------- Cards & KPI ---------- */
+.kpis{display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px}
+@media(min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; box-shadow:var(--shadow)}
+.kpi .v{font-family:"Reem Kufi"; font-size:26px; font-weight:700; color:var(--roast-deep); line-height:1.15}
+.kpi .l{font-size:11.5px; color:var(--muted)}
+.kpi.warn .v{color:var(--red)}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:14px; margin-bottom:12px}
+.card h3{font-size:14px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px}
+.card h3::after{content:""; flex:1; height:1px; background:var(--line)}
+/* ---------- Roast priority bar (signature) ---------- */
+.roast{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:var(--muted)}
+.beans{display:inline-flex; gap:2.5px}
+.bean{width:9px; height:12px; border-radius:50% 50% 50% 50%/60% 60% 40% 40%; background:#EADFCB; position:relative}
+.bean::after{content:""; position:absolute; inset:2px auto 2px 50%; width:1px; background:rgba(255,255,255,.55); transform:translateX(-50%) rotate(8deg)}
+.p-قصوى .bean.f{background:var(--p1)} .p-مرتفعة .bean.f{background:var(--p2)}
+.p-متوسطة .bean.f{background:var(--p3)} .p-منخفضة .bean.f{background:var(--p4)}
+/* ---------- Queue (اليوم) ---------- */
+.q{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:13px 14px; margin-bottom:11px; border-inline-start:4px solid var(--line)}
+.q.p-قصوى{border-inline-start-color:var(--p1)} .q.p-مرتفعة{border-inline-start-color:var(--p2)}
+.q.p-متوسطة{border-inline-start-color:var(--p3)} .q.p-منخفضة{border-inline-start-color:var(--p4)}
+.q .top{display:flex; align-items:flex-start; gap:8px}
+.q .name{font-weight:700; font-size:15.5px}
+.q .meta{font-size:11.5px; color:var(--muted); margin-top:1px}
+.q .angle{margin:9px 0 10px; font-size:12.8px; background:var(--amber-soft); border-radius:10px; padding:8px 11px; color:#5d4526; position:relative}
+.q .angle b{color:var(--roast-deep)}
+.acts{display:flex; gap:8px; flex-wrap:wrap}
+.btn{border:0; font-family:inherit; font-size:12.5px; font-weight:600; border-radius:10px; padding:8px 13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:.15s}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn:active{transform:scale(.97)}
+.b-call{background:var(--roast); color:#fff}
+.b-wa{background:var(--green); color:#fff}
+.b-ghost{background:transparent; color:var(--roast); border:1px solid var(--line)}
+.b-amber{background:var(--amber); color:#fff}
+.b-red{background:var(--red-soft); color:var(--red)}
+.b-sm{padding:6px 10px; font-size:11.5px}
+/* ---------- Filters / chips ---------- */
+.chips{display:flex; gap:7px; overflow-x:auto; padding-bottom:6px; margin-bottom:10px; scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto; font-size:12px; font-weight:600; border:1px solid var(--line); background:var(--card); color:var(--muted); border-radius:99px; padding:6px 13px; cursor:pointer}
+.chip.on{background:var(--roast-deep); border-color:var(--roast-deep); color:#F0DFBF}
+input.search,select.sel,textarea.ta,input.inp{
+  width:100%; font-family:inherit; font-size:14px; border:1px solid var(--line); background:var(--card);
+  border-radius:11px; padding:10px 13px; color:var(--ink); outline:none;
+}
+input.search:focus,textarea.ta:focus,input.inp:focus{border-color:var(--amber)}
+/* ---------- Account rows ---------- */
+.row{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:8px; display:flex; align-items:center; gap:10px; cursor:pointer}
+.row .grow{flex:1; min-width:0}
+.row .nm{font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .mt{font-size:11px; color:var(--muted)}
+.tag{font-size:10px; font-weight:700; border-radius:7px; padding:2px 8px; white-space:nowrap}
+.t-lead{background:var(--amber-soft); color:#8a5f22}
+.t-cust{background:var(--green-soft); color:var(--green)}
+.t-x{background:#eee7db; color:#9a8a75}
+.star{color:var(--amber); font-size:11px; font-weight:700}
+/* ---------- Kanban ---------- */
+.board{display:flex; gap:10px; overflow-x:auto; padding-bottom:10px; scroll-snap-type:x mandatory}
+.col{flex:0 0 240px; scroll-snap-align:start; background:#EFE7D7; border:1px solid var(--line); border-radius:var(--r); padding:10px}
+.col h4{font-size:12.5px; font-weight:700; display:flex; justify-content:space-between; margin-bottom:9px; color:#5d4a35}
+.col h4 .c{background:var(--card); border-radius:8px; padding:0 8px; font-size:11px; color:var(--muted)}
+.deal{background:var(--card); border:1px solid var(--line); border-radius:11px; padding:10px 11px; margin-bottom:8px; box-shadow:var(--shadow)}
+.deal .dn{font-weight:700; font-size:13px}
+.deal .dk{font-size:11px; color:var(--muted); margin:3px 0 8px}
+.deal .mv{display:flex; gap:6px}
+.mvb{flex:1; border:1px solid var(--line); background:#FBF7EE; border-radius:8px; font-family:inherit; font-size:11px; font-weight:600; color:var(--roast); padding:5px 0; cursor:pointer}
+/* ---------- Tasks ---------- */
+.task{display:flex; gap:10px; align-items:flex-start; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 13px; margin-bottom:8px}
+.task.late{border-inline-start:4px solid var(--red)}
+.task .tt{font-weight:600; font-size:13.5px}
+.task .td{font-size:11.5px; color:var(--muted)}
+.done{margin-inline-start:auto}
+/* ---------- Charts ---------- */
+.bars{display:flex; flex-direction:column; gap:8px}
+.bar{display:grid; grid-template-columns:92px 1fr 46px; align-items:center; gap:9px; font-size:12px}
+.bar .tr{background:#EFE7D7; border-radius:8px; height:14px; overflow:hidden}
+.bar .fl{height:100%; border-radius:8px; background:linear-gradient(90deg,var(--roast),var(--amber))}
+.bar .vv{color:var(--muted); text-align:left}
+.legend{display:flex; flex-wrap:wrap; gap:10px; font-size:11.5px; color:var(--muted); margin-top:8px}
+.legend i{width:10px;height:10px;border-radius:3px;display:inline-block;margin-inline-end:4px}
+/* ---------- Sheet (bottom modal) ---------- */
+#ovl{position:fixed; inset:0; background:rgba(32,20,9,.45); z-index:80; display:none}
+#ovl.on{display:block}
+#sheet{position:fixed; bottom:0; right:0; left:0; z-index:90; background:var(--card);
+  border-radius:20px 20px 0 0; max-height:88dvh; overflow-y:auto; padding:10px 18px calc(24px + env(safe-area-inset-bottom));
+  transform:translateY(100%); transition:transform .22s ease; box-shadow:0 -10px 40px rgba(0,0,0,.25)}
+#sheet.on{transform:none}
+#sheet .grab{width:44px; height:4px; border-radius:99px; background:var(--line); margin:6px auto 14px}
+@media(min-width:900px){
+  #sheet{right:auto; left:24px; bottom:24px; width:430px; border-radius:18px; max-height:82dvh}
+  #sheet:not(.on){transform:translateY(20px); opacity:0; pointer-events:none}
+  #sheet{transition:.2s}
+}
+.sh-name{font-size:18px; font-weight:700}
+.sh-meta{font-size:12px; color:var(--muted); margin:2px 0 12px}
+.sh-sec{margin:14px 0 6px; font-size:12px; font-weight:700; color:#7a664f; letter-spacing:.3px}
+.rev{border-inline-start:3px solid var(--line); padding:7px 11px; margin-bottom:7px; background:#FBF7EE; border-radius:0 10px 10px 0; font-size:12.3px}
+.rev.bad{border-inline-start-color:var(--red)} .rev.good{border-inline-start-color:var(--green)}
+.rev .rr{font-size:10.5px; color:var(--muted); margin-top:2px}
+.rev .tags{margin-top:4px; display:flex; flex-wrap:wrap; gap:4px}
+.rev .tg{font-size:9.5px; background:var(--red-soft); color:var(--red); border-radius:6px; padding:1px 7px}
+.frm{display:flex; flex-direction:column; gap:9px; margin-top:8px}
+/* ---------- toast / setup ---------- */
+#toast{position:fixed; bottom:calc(84px + env(safe-area-inset-bottom)); right:50%; transform:translateX(50%) translateY(18px);
+  background:var(--roast-deep); color:#F0DFBF; font-size:13px; padding:10px 18px; border-radius:12px; z-index:120; opacity:0; transition:.25s; pointer-events:none; max-width:88vw; text-align:center}
+#toast.on{opacity:1; transform:translateX(50%)}
+#setup{position:fixed; inset:0; z-index:200; background:linear-gradient(165deg,#1c1006,#3B2415); display:none; align-items:center; justify-content:center; padding:22px}
+#setup.on{display:flex}
+#setup .bx{background:var(--card); border-radius:18px; padding:26px 22px; max-width:420px; width:100%}
+#setup .logo{font-family:"Reem Kufi"; font-size:34px; font-weight:700; color:var(--roast-deep); text-align:center}
+#setup p{font-size:13px; color:var(--muted); text-align:center; margin:6px 0 16px}
+.empty{text-align:center; color:var(--muted); font-size:13px; padding:34px 10px}
+.empty .big{font-size:34px; margin-bottom:8px}
+.mini{font-size:11px;color:var(--muted)}
+a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="logo">أوان</span><small>منظومة مبيعات البن — الرياض</small></div>
+  <span id="connBadge" onclick="openSetup()">غير متصل</span>
+</header>
+
+<main>
+<!-- ======== اليوم ======== -->
+<section class="screen on" id="scr-today">
+  <h2 class="scr">مكالمات اليوم</h2>
+  <div class="sub" id="todaySub">مرتبة حسب الأولوية — افتح، اتصل، سجّل النتيجة</div>
+  <div class="chips" id="todayChips"></div>
+  <div id="queue"></div>
+</section>
+
+<!-- ======== اللوحة ======== -->
+<section class="screen" id="scr-dash">
+  <h2 class="scr">اللوحة</h2>
+  <div class="sub" id="dashDate"></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><h3>خط الصفقات (كغ/شهر)</h3><div class="bars" id="chPipe"></div></div>
+  <div class="card"><h3>الحسابات حسب الأولوية</h3><div class="bars" id="chPrio"></div></div>
+  <div class="card"><h3>أعلى الأحياء (عدد الحسابات المفتوحة)</h3><div class="bars" id="chDist"></div></div>
+</section>
+
+<!-- ======== الحسابات ======== -->
+<section class="screen" id="scr-acc">
+  <h2 class="scr">الحسابات</h2>
+  <div class="sub" id="accCount"></div>
+  <input class="search" id="accSearch" placeholder="ابحث بالاسم أو الحي أو الهاتف…" oninput="renderAccounts()">
+  <div style="height:9px"></div>
+  <div class="chips" id="accChips"></div>
+  <div id="accList"></div>
+</section>
+
+<!-- ======== الصفقات ======== -->
+<section class="screen" id="scr-deals">
+  <h2 class="scr">الصفقات</h2>
+  <div class="sub" id="dealsSub"></div>
+  <div class="board" id="board"></div>
+</section>
+
+<!-- ======== المهام ======== -->
+<section class="screen" id="scr-tasks">
+  <h2 class="scr">المتابعات</h2>
+  <div class="sub">المتأخر أولاً — لا تترك متابعة تبرد مثل القهوة</div>
+  <div id="tasks"></div>
+</section>
+</main>
+
+<nav>
+  <button data-s="today" class="on" onclick="go('today',this)"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.08 4.18 2 2 0 0 1 4.06 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>اليوم</button>
+  <button data-s="dash" onclick="go('dash',this)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>اللوحة</button>
+  <button data-s="acc" onclick="go('acc',this)"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>الحسابات</button>
+  <button data-s="deals" onclick="go('deals',this)"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>الصفقات</button>
+  <button data-s="tasks" onclick="go('tasks',this)"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>المتابعات</button>
+</nav>
+
+<div id="ovl" onclick="closeSheet()"></div>
+<div id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+<div id="toast"></div>
+
+<div id="setup">
+  <div class="bx">
+    <div class="logo">أوان</div>
+    <p>اربط الشاشة بقاعدة بياناتك في Supabase<br>أو جرّب النسخة التجريبية ببيانات واقعية</p>
+    <div class="frm">
+      <input class="inp" id="keyIn" dir="ltr" placeholder="Supabase anon key — الصق المفتاح هنا" style="font-size:12px">
+      <button class="btn b-call" style="justify-content:center" onclick="saveKey()">اتصال مباشر بالقاعدة</button>
+      <button class="btn b-ghost" style="justify-content:center" onclick="startDemo()">جرّب النسخة التجريبية</button>
+      <div class="mini" style="text-align:center">المفتاح: Supabase → Settings → API Keys → anon public</div>
+    </div>
+  </div>
+</div>
+<script>
+/* ================= إعدادات ================= */
+const SB_URL = "https://fglzyryytvzgrmxshwyg.supabase.co";
+let SB_KEY = "";            // يُحفظ محلياً بعد أول إدخال
+let DEMO = false;
+const STAGES = ["new","contacted","sample_sent","negotiation","won","lost","frozen"];
+const STAGE_AR = {new:"جديدة",contacted:"تم التواصل",sample_sent:"أُرسلت عينة",negotiation:"تفاوض",won:"مكسوبة",lost:"خاسرة",frozen:"مجمّدة"};
+const PRIOS = ["قصوى","مرتفعة","متوسطة","منخفضة"];
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},
+               set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+/* ================= حالة ================= */
+let ACC=[], DEALS=[], ACTS=[], REVS=[];
+let accFilter="الكل", todayFilter="الكل";
+
+/* ================= REST ================= */
+async function api(path, opts={}){
+  if(DEMO) throw new Error("demo");
+  const r = await fetch(SB_URL + "/rest/v1/" + path, {
+    ...opts,
+    headers:{apikey:SB_KEY, Authorization:"Bearer "+SB_KEY,
+             "Content-Type":"application/json", Prefer:"return=representation", ...(opts.headers||{})}
+  });
+  if(!r.ok){ const t = await r.text(); throw new Error(t.slice(0,300)); }
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+async function loadAll(){
+  const [a,d,ac,rv] = await Promise.all([
+    api("crm_accounts?select=*&order=reviews_count.desc.nullslast&limit=1000"),
+    api("crm_deals?select=*&order=id.desc&limit=500"),
+    api("crm_activities?select=*&order=id.desc&limit=800"),
+    api("crm_reviews?select=*&limit=1000")
+  ]);
+  ACC=a||[]; DEALS=d||[]; ACTS=ac||[]; REVS=rv||[];
+}
+
+/* ================= بيانات تجريبية ================= */
+function demoData(){
+  const N=(n,p,dist,rev,rating,ph,notes,st="lead",seg="مستقل")=>({id:n[0],name_ar:n[1],priority:p,district:dist,reviews_count:rev,rating,phone:ph,notes,status:st,segment:seg});
+  ACC=[
+    N([1,"غندورة"],"قصوى","الغدير",1450,4.0,"0550400704","شكوى متكررة: «قهوة سيئة جداً» + كولومبي رديء. الزاوية: التفاوت بين الزيارات — بن أغتون ثابت + معايرة مجانية لـ3 فروع. تحقق: هل يحمصون بأنفسهم؟"),
+    N([2,"إم دي M DEE"],"قصوى","الياسمين",4175,4.3,"0552180070","حلاهم أسطوري (الليمون ×306) والقهوة ما توازيه. مشكلة نظامية بخط الإسبرسو والحليب. العرض: بلند باسمهم + تدريب + جدولة 24h. صفقة 600 كغ.","lead","سلسلة"),
+    N([3,"بي فاين"],"قصوى","الصحافة",980,4.2,"0561208112","«البن دائماً حامضي» — بروفايل متوازن أقل حمضية + جلسة تذوق مجانية. حساسية سعر 16 ريال."),
+    N([4,"سِّرب"],"قصوى","الرمال",1210,4.1,"0583542717","«القهوة صارت سيئة» — كانوا الأفضل ويعرفون الفرق. محاصيل إثيوبية/يمنية + جدولة 24h."),
+    N([5,"لايقر"],"قصوى","الملقا",760,4.3,"0551933933","فلات وايتهم بطل (×68) لكن سقنتشر/سبانش غير موزونة. حزمة: بن أطزج + معايرة + تطوير وصفات. لا يردون على الجوال — واتساب ثم زيارة."),
+    N([6,"درايف كوفي"],"مرتفعة","المقر الرئيسي",8270,4.4,"920010126","44 فرعاً. قهوتهم ممدوحة — لا زاوية جودة. الزاوية: توحيد الطعم بين فروع الامتياز + توريد مركزي. المالك: محمد الحازمي. 920 كغ.","lead","سلسلة"),
+    N([7,"تيلر"],"مرتفعة","أكشاك المترو",640,4.5,"0556900621","قهوة ممدوحة حتى في مراجعات النجمة الواحدة؛ المشكلة نفاد الأصناف. أقل سعر كيلو + ضمان توفر. الإدارة متجاوبة.","lead","سلسلة"),
+    N([8,"كروي بيت الخبز"],"مرتفعة","العقيق",2100,4.6,"0500000001","الفلات وايت مذكور ×192 — بلند حصري باسمهم + بروتوكول توصيل. 150 كغ."),
+    N([9,"يوليكا"],"مرتفعة","الياسمين",890,4.5,"0500000002","قهوة قوية ممدوحة؛ ثبات وقت الضغط + أكواب لا تسرب. سقف سعر 24 ريال (V60)."),
+    N([10,"كلتورا ديل"],"مرتفعة","الربيع",720,4.3,"0500000003","شكوى «صغّروا الكوب بنفس السعر» = ضغط تكلفة — سعر كيلو يرجّع الحجم بلا خسارة."),
+    N([11,"ريشيو"],"متوسطة","العليا",1600,4.4,"0500000004","V60 نقطة قوتهم. الزاوية: باتش بريو صباحي (لا قهوة حارة صباحاً!) + منع انقطاع."),
+    N([12,"Deki"],"متوسطة","الصحافة",540,4.2,"0500000005","آيس دريب 10/10؛ المشكلة نظافة معدات (بالصور) — حزمة نظافة + معايرة دورية."),
+    N([13,"ميركوري"],"منخفضة","السويدي",3100,4.0,"0500000006","شيشة ×511 — القهوة ثانوية. مؤجل."),
+    N([14,"أربول"],"منخفضة","النرجس",430,3.9,"0500000007","مشاكل تشغيل أعمق من القهوة. مؤجل."),
+  ];
+  DEALS=[
+    {id:1,account_id:2,stage:"contacted",expected_monthly_kg:600,probability:35},
+    {id:2,account_id:6,stage:"new",expected_monthly_kg:920,probability:20},
+    {id:3,account_id:1,stage:"sample_sent",expected_monthly_kg:120,probability:55},
+    {id:4,account_id:4,stage:"sample_sent",expected_monthly_kg:50,probability:60},
+    {id:5,account_id:3,stage:"negotiation",expected_monthly_kg:60,probability:70},
+    {id:6,account_id:8,stage:"contacted",expected_monthly_kg:150,probability:40},
+    {id:7,account_id:7,stage:"new",expected_monthly_kg:80,probability:25},
+    {id:8,account_id:5,stage:"won",expected_monthly_kg:40,probability:100},
+  ];
+  const d=off=>{const x=new Date();x.setDate(x.getDate()+off);return x.toISOString().slice(0,10)};
+  ACTS=[
+    {id:1,account_id:1,activity_type:"call",notes:"مهتم بالمعايرة المجانية",next_action:"إرسال عينة أغتون لفرع الغدير",next_action_date:d(-2)},
+    {id:2,account_id:2,activity_type:"call",notes:"وصلنا لمسؤول التشغيل",next_action:"اجتماع تجربة عمياء على فرعين",next_action_date:d(0)},
+    {id:3,account_id:4,activity_type:"whatsapp",notes:"أعجبتهم فكرة محاصيل زمان",next_action:"متابعة رأيهم بالعينة الإثيوبية",next_action_date:d(1)},
+    {id:4,account_id:6,activity_type:"call",notes:"سكرتير المقر حوّلنا للمشتريات",next_action:"اتصال بالمشتريات — الثلاثاء",next_action_date:d(3)},
+    {id:5,account_id:5,activity_type:"visit",notes:"جلسة تطوير وصفات ناجحة",next_action:"توقيع أول طلبية شهرية",next_action_date:d(-1)},
+  ];
+  REVS=[
+    {account_id:1,rating:1,excerpt:"قهوة سيئة جداً وما تستاهل السعر، الكولومبي بلا طعم",complaint_tags:["جودة البن","السعر مقابل القيمة"],review_date_text:"قبل شهر"},
+    {account_id:1,rating:2,excerpt:"كل زيارة طعم مختلف، مرة ممتازة ومرة ما تنشرب",complaint_tags:["عدم الثبات"],review_date_text:"قبل 3 أسابيع"},
+    {account_id:2,rating:2,excerpt:"الحلا أسطوري بس اللاتيه محروق، والتوصيل وصل بن محترق",complaint_tags:["حليب محروق","التوصيل"],review_date_text:"قبل أسبوعين"},
+    {account_id:2,rating:1,excerpt:"أسوأ كابتشينو جربته — وهذا ثاني فرع أجربه",complaint_tags:["مشروبات الحليب"],review_date_text:"قبل شهر"},
+    {account_id:3,rating:3,excerpt:"المكان مرتب بس البن دائماً حامضي",complaint_tags:["حموضة عالية"],review_date_text:"قبل أسبوع"},
+    {account_id:4,rating:2,excerpt:"القهوة صارت سيئة، وين أيامكم الأولى؟ نبي التحسين",complaint_tags:["تراجع الجودة"],review_date_text:"قبل 10 أيام"},
+    {account_id:5,rating:5,excerpt:"الفلات وايت عندهم بطل، بس السقنتشر مو موزون",complaint_tags:["مشروبات مركبة"],review_date_text:"قبل أسبوع"},
+    {account_id:6,rating:5,excerpt:"قهوتهم ثابتة وطعمها ممتاز، أفضل درايف ثرو",complaint_tags:null,review_date_text:"قبل 5 أيام"},
+    {account_id:7,rating:1,excerpt:"القهوة ممتازة بس نص الأصناف مقطوعة دايماً",complaint_tags:["نفاد الأصناف"],review_date_text:"قبل أسبوعين"},
+  ];
+}
+/* ================= أدوات ================= */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+const digits=s=>String(s||"").replace(/\D/g,"");
+const waNum=p=>{let n=digits(p); if(n.startsWith("0")) n="966"+n.slice(1); if(!n.startsWith("966")&&n.length<=10) n="966"+n; return n};
+const accById=id=>ACC.find(a=>a.id==id)||{};
+const openDeals=()=>DEALS.filter(d=>!["won","lost","frozen"].includes(d.stage));
+const isOpenAcc=a=>!a.exclusion_reason && a.status!=="excluded";
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),2600)}
+function beans(p){const lvl={"قصوى":4,"مرتفعة":3,"متوسطة":2,"منخفضة":1}[p]||0;
+  return `<span class="roast p-${p}"><span class="beans">`+[1,2,3,4].map(i=>`<span class="bean ${i<=lvl?"f":""}"></span>`).join("")+`</span>${p||""}</span>`}
+function today0(){const t=new Date();t.setHours(0,0,0,0);return t}
+function fmtD(s){if(!s)return"";const d=new Date(s);const diff=Math.round((d-today0())/864e5);
+  if(diff===0)return"اليوم"; if(diff===1)return"غداً"; if(diff===-1)return"أمس";
+  if(diff<0)return`متأخر ${-diff} يوم`; return d.toLocaleDateString("ar-SA",{day:"numeric",month:"short"})}
+
+/* ================= تنقّل ================= */
+function go(s,btn){document.querySelectorAll(".screen").forEach(e=>e.classList.remove("on"));
+  $("scr-"+s).classList.add("on");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b===btn));
+  ({today:renderToday,dash:renderDash,acc:renderAccounts,deals:renderDeals,tasks:renderTasks}[s])();}
+
+/* ================= اليوم ================= */
+function renderToday(){
+  const chips=["الكل",...PRIOS];
+  $("todayChips").innerHTML=chips.map(c=>`<button class="chip ${todayFilter===c?"on":""}" onclick="todayFilter='${c}';renderToday()">${c}</button>`).join("");
+  const leads=ACC.filter(a=>isOpenAcc(a)&&(a.status==="lead"||a.status==="contacted"||!a.status))
+    .filter(a=>todayFilter==="الكل"||a.priority===todayFilter)
+    .sort((a,b)=>(PRIOS.indexOf(a.priority??9)-PRIOS.indexOf(b.priority??9))||((b.reviews_count||0)-(a.reviews_count||0)))
+    .slice(0,30);
+  $("todaySub").textContent=`${leads.length} حساب جاهز للتواصل — مرتب حسب الأولوية ثم الحركة`;
+  $("queue").innerHTML=leads.length?leads.map(a=>{
+    const angle=a.notes?`<div class="angle"><b>الزاوية:</b> ${esc(a.notes)}</div>`:"";
+    return `<div class="q p-${a.priority||""}">
+      <div class="top"><div style="flex:1;min-width:0">
+        <div class="name">${esc(a.name_ar)}</div>
+        <div class="meta">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span></div>
+      </div>${beans(a.priority)}</div>
+      ${angle}
+      <div class="acts">
+        <a class="btn b-call b-sm" href="tel:${digits(a.phone)}"><svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 5.18 2 2 0 0 1 5.06 3h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L9.09 10.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>اتصال</a>
+        <a class="btn b-wa b-sm" target="_blank" href="https://wa.me/${waNum(a.phone)}">واتساب</a>
+        <button class="btn b-amber b-sm" onclick="quickLog(${a.id})">سجّل النتيجة</button>
+        <button class="btn b-ghost b-sm" onclick="openAcc(${a.id})">البطاقة</button>
+      </div></div>`;
+  }).join(""):`<div class="empty"><div class="big">☕</div>ما فيه حسابات مطابقة — وسّع الفلتر أو أضف حسابات جديدة</div>`;
+}
+
+/* ================= اللوحة ================= */
+function bar(label,val,max,color){const w=max?Math.max(3,val/max*100):0;
+  return `<div class="bar"><span>${esc(label)}</span><span class="tr"><span class="fl" style="width:${w}%;${color?`background:${color}`:""}"></span></span><span class="vv num">${val}</span></div>`}
+function renderDash(){
+  $("dashDate").textContent=new Date().toLocaleDateString("ar-SA",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  const open=openDeals();
+  const kg=open.reduce((s,d)=>s+(+d.expected_monthly_kg||0),0);
+  const wkg=open.reduce((s,d)=>s+(+d.expected_monthly_kg||0)*((+d.probability||0)/100),0);
+  const late=ACTS.filter(x=>x.next_action_date&&new Date(x.next_action_date)<today0()).length;
+  const wk=ACTS.filter(x=>{const c=x.created_at?new Date(x.created_at):null;return c&&(Date.now()-c)<7*864e5}).length;
+  const won=DEALS.filter(d=>d.stage==="won").reduce((s,d)=>s+(+d.expected_monthly_kg||0),0);
+  $("kpis").innerHTML=`
+    <div class="kpi"><div class="v num">${ACC.filter(isOpenAcc).length}</div><div class="l">حساب مفتوح</div></div>
+    <div class="kpi"><div class="v num">${open.length}</div><div class="l">صفقة نشطة</div></div>
+    <div class="kpi"><div class="v num">${Math.round(kg).toLocaleString("en")} <span style="font-size:13px">كغ</span></div><div class="l">حجم الخط الشهري · موزون <span class="num">${Math.round(wkg)}</span> كغ</div></div>
+    <div class="kpi ${late?"warn":""}"><div class="v num">${late}</div><div class="l">متابعة متأخرة</div></div>`;
+  const pipe=STAGES.filter(s=>!["lost","frozen"].includes(s)).map(s=>({s,v:DEALS.filter(d=>d.stage===s).reduce((x,d)=>x+(+d.expected_monthly_kg||0),0)}));
+  const pm=Math.max(...pipe.map(p=>p.v),1);
+  $("chPipe").innerHTML=pipe.map(p=>bar(STAGE_AR[p.s],Math.round(p.v),pm,p.s==="won"?"var(--green)":null)).join("")
+    +`<div class="legend"><span>مكسوب حتى الآن: <b class="num">${Math.round(won)}</b> كغ/شهر</span><span>نشاط آخر ٧ أيام: <b class="num">${wk}</b></span></div>`;
+  const pr=PRIOS.map(p=>({p,v:ACC.filter(a=>isOpenAcc(a)&&a.priority===p).length}));
+  const prm=Math.max(...pr.map(x=>x.v),1);
+  const pc={"قصوى":"var(--p1)","مرتفعة":"var(--p2)","متوسطة":"var(--p3)","منخفضة":"var(--p4)"};
+  $("chPrio").innerHTML=pr.map(x=>bar(x.p,x.v,prm,pc[x.p])).join("");
+  const dm={}; ACC.filter(isOpenAcc).forEach(a=>{if(a.district)dm[a.district]=(dm[a.district]||0)+1});
+  const ds=Object.entries(dm).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const dmx=Math.max(...ds.map(x=>x[1]),1);
+  $("chDist").innerHTML=ds.map(([k,v])=>bar(k,v,dmx)).join("")||`<div class="mini">لا توجد بيانات أحياء</div>`;
+}
+
+/* ================= الحسابات ================= */
+function renderAccounts(){
+  const chips=["الكل",...PRIOS,"عملاء","مستبعد"];
+  $("accChips").innerHTML=chips.map(c=>`<button class="chip ${accFilter===c?"on":""}" onclick="accFilter='${c}';renderAccounts()">${c}</button>`).join("");
+  const q=($("accSearch").value||"").trim();
+  let list=ACC.filter(a=>{
+    if(accFilter==="مستبعد")return !!a.exclusion_reason||a.status==="excluded";
+    if(!isOpenAcc(a))return false;
+    if(accFilter==="عملاء")return a.status==="customer"||DEALS.some(d=>d.account_id==a.id&&d.stage==="won");
+    if(PRIOS.includes(accFilter))return a.priority===accFilter;
+    return true;});
+  if(q)list=list.filter(a=>[a.name_ar,a.district,a.phone,a.chain_name].join(" ").includes(q));
+  list.sort((a,b)=>(PRIOS.indexOf(a.priority??9)-PRIOS.indexOf(b.priority??9))||((b.reviews_count||0)-(a.reviews_count||0)));
+  $("accCount").textContent=`${list.length} حساب`;
+  $("accList").innerHTML=list.slice(0,200).map(a=>{
+    const cust=a.status==="customer"||DEALS.some(d=>d.account_id==a.id&&d.stage==="won");
+    const tag=a.exclusion_reason?`<span class="tag t-x">مستبعد</span>`:cust?`<span class="tag t-cust">عميل</span>`:`<span class="tag t-lead">${a.status==="contacted"?"تم التواصل":"فرصة"}</span>`;
+    return `<div class="row" onclick="openAcc(${a.id})">
+      <div class="grow"><div class="nm">${esc(a.name_ar)}</div>
+      <div class="mt">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span></div></div>
+      ${tag}${beans(a.priority)}</div>`;
+  }).join("")||`<div class="empty"><div class="big">🔍</div>لا نتائج مطابقة</div>`;
+}
+/* ================= بطاقة الحساب ================= */
+function openSheet(html){$("sheetBody").innerHTML=html;$("ovl").classList.add("on");$("sheet").classList.add("on")}
+function closeSheet(){$("ovl").classList.remove("on");$("sheet").classList.remove("on")}
+function openAcc(id){
+  const a=accById(id);
+  const revs=REVS.filter(r=>r.account_id==id).slice(0,6);
+  const deals=DEALS.filter(d=>d.account_id==id);
+  const acts=ACTS.filter(x=>x.account_id==id).slice(0,5);
+  openSheet(`
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="flex:1"><div class="sh-name">${esc(a.name_ar)}</div>
+      <div class="sh-meta">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span>${a.chain_name?` · سلسلة: ${esc(a.chain_name)}`:""}</div></div>
+      ${beans(a.priority)}</div>
+    <div class="acts" style="margin-bottom:4px">
+      <a class="btn b-call b-sm" href="tel:${digits(a.phone)}">اتصال</a>
+      <a class="btn b-wa b-sm" target="_blank" href="https://wa.me/${waNum(a.phone)}">واتساب</a>
+      ${a.google_maps_url?`<a class="btn b-ghost b-sm" target="_blank" href="${esc(a.google_maps_url)}">الخريطة</a>`:""}
+      ${a.website?`<a class="btn b-ghost b-sm" target="_blank" href="${esc(a.website)}">الموقع</a>`:""}
+    </div>
+    ${a.notes?`<div class="sh-sec">الزاوية البيعية</div><div class="q p-${a.priority||""}" style="margin:0"><div class="angle" style="margin:0">${esc(a.notes)}</div></div>`:""}
+    ${revs.length?`<div class="sh-sec">مراجعات قوقل المرصودة</div>`+revs.map(r=>`
+      <div class="rev ${r.rating<=2?"bad":r.rating>=4?"good":""}">«${esc(r.excerpt)}»
+        <div class="rr">★ ${r.rating} · ${esc(r.review_date_text||"")} ${r.branch_label?"· "+esc(r.branch_label):""}</div>
+        ${r.complaint_tags&&r.complaint_tags.length?`<div class="tags">${r.complaint_tags.map(t=>`<span class="tg">${esc(t)}</span>`).join("")}</div>`:""}
+      </div>`).join(""):""}
+    ${deals.length?`<div class="sh-sec">الصفقات</div>`+deals.map(d=>`<div class="rev">${STAGE_AR[d.stage]||d.stage} — <b class="num">${d.expected_monthly_kg||0}</b> كغ/شهر · احتمال <span class="num">${d.probability||0}%</span></div>`).join(""):""}
+    ${acts.length?`<div class="sh-sec">آخر النشاط</div>`+acts.map(x=>`<div class="rev">${esc(x.notes||x.activity_type||"")}${x.next_action?`<div class="rr">التالي: ${esc(x.next_action)} — ${fmtD(x.next_action_date)}</div>`:""}</div>`).join(""):""}
+    <div class="sh-sec">إجراء</div>
+    <div class="acts">
+      <button class="btn b-amber b-sm" onclick="quickLog(${a.id})">سجّل مكالمة</button>
+      ${deals.length?"":`<button class="btn b-ghost b-sm" onclick="newDeal(${a.id})">افتح صفقة</button>`}
+    </div>`);
+}
+
+/* ================= تسجيل سريع ================= */
+function quickLog(id){
+  const a=accById(id);
+  const opts=[["مهتم — أرسل عينة","إرسال عينة وتحديد موعد تذوق",2],
+              ["موعد محدد","تجهيز العينات قبل الموعد",1],
+              ["ما رد","إعادة الاتصال",1],
+              ["اتصال لاحقاً","متابعة حسب طلبهم",3],
+              ["غير مهتم حالياً","إعادة المحاولة بعد شهر",30]];
+  openSheet(`<div class="sh-name">نتيجة التواصل — ${esc(a.name_ar)}</div>
+    <div class="sh-meta">اختر النتيجة وستُسجَّل مع متابعة تلقائية</div>
+    <div class="frm">${opts.map((o,i)=>`<button class="btn ${i===0?"b-call":"b-ghost"}" style="justify-content:center" onclick="logResult(${id},${i})">${o[0]}</button>`).join("")}
+    <textarea class="ta" id="logNote" rows="2" placeholder="ملاحظة إضافية (اختياري)…"></textarea></div>`);
+  window._opts=opts;
+}
+async function logResult(id,i){
+  const [label,next,days]=window._opts[i];
+  const note=($("logNote")?.value||"").trim();
+  const d=new Date(); d.setDate(d.getDate()+days);
+  const row={account_id:id,activity_type:"call",notes:label+(note?" — "+note:""),next_action:next,next_action_date:d.toISOString().slice(0,10)};
+  try{
+    if(DEMO){ACTS.unshift({id:Date.now(),...row})}
+    else{await api("crm_activities",{method:"POST",body:JSON.stringify(row)})
+         ;ACTS.unshift(row)}
+    if(label.startsWith("مهتم")||label.startsWith("موعد")){
+      const a=accById(id); if(a.status==="lead"){
+        try{ if(!DEMO) await api(`crm_accounts?id=eq.${id}`,{method:"PATCH",body:JSON.stringify({status:"contacted"})}); a.status="contacted"; }catch(e){}
+      }}
+    closeSheet(); toast("سُجّلت النتيجة والمتابعة ✅"); renderToday();
+  }catch(e){toast("تعذر الحفظ: "+e.message)}
+}
+async function newDeal(id){
+  const kg=prompt("الكمية الشهرية المتوقعة بالكيلو؟","60"); if(kg===null)return;
+  const row={account_id:id,stage:"new",expected_monthly_kg:+kg||0,probability:20};
+  try{
+    if(DEMO){DEALS.unshift({id:Date.now(),...row})}
+    else{const r=await api("crm_deals",{method:"POST",body:JSON.stringify(row)}); DEALS.unshift(r?.[0]||row)}
+    closeSheet(); toast("فُتحت الصفقة 🎯");
+  }catch(e){toast("تعذر فتح الصفقة: "+e.message)}
+}
+
+/* ================= الصفقات ================= */
+function renderDeals(){
+  const open=openDeals();
+  const kg=open.reduce((s,d)=>s+(+d.expected_monthly_kg||0),0);
+  $("dealsSub").textContent=`${open.length} صفقة نشطة · ${Math.round(kg).toLocaleString("en")} كغ/شهر في الخط`;
+  $("board").innerHTML=STAGES.map(s=>{
+    const ds=DEALS.filter(d=>d.stage===s);
+    const skg=ds.reduce((x,d)=>x+(+d.expected_monthly_kg||0),0);
+    return `<div class="col"><h4>${STAGE_AR[s]}<span class="c num">${ds.length} · ${Math.round(skg)} كغ</span></h4>
+      ${ds.map(d=>{const a=accById(d.account_id);
+        const i=STAGES.indexOf(s);
+        const prev=i>0&&!["won","lost","frozen"].includes(s)?STAGES[i-1]:null;
+        const nxt=i<3?STAGES[i+1]:(s==="negotiation"?"won":null);
+        return `<div class="deal"><div class="dn">${esc(a.name_ar||"؟")}</div>
+          <div class="dk"><span class="num">${d.expected_monthly_kg||0}</span> كغ/شهر · احتمال <span class="num">${d.probability||0}%</span></div>
+          <div class="mv">
+            ${prev?`<button class="mvb" onclick="moveDeal(${d.id},'${prev}')">→ ${STAGE_AR[prev]}</button>`:""}
+            ${nxt?`<button class="mvb" style="color:var(--green)" onclick="moveDeal(${d.id},'${nxt}')">${STAGE_AR[nxt]} ←</button>`:""}
+            ${s==="negotiation"?`<button class="mvb" style="color:var(--red)" onclick="moveDeal(${d.id},'lost')">خسارة</button>`:""}
+          </div></div>`}).join("")||`<div class="mini" style="text-align:center;padding:14px 0">فارغة</div>`}
+    </div>`}).join("");
+}
+async function moveDeal(id,stage){
+  const d=DEALS.find(x=>x.id==id); if(!d)return;
+  const old=d.stage; d.stage=stage; renderDeals();
+  try{ if(!DEMO) await api(`crm_deals?id=eq.${id}`,{method:"PATCH",body:JSON.stringify({stage})});
+    toast(stage==="won"?"مبروك! صفقة مكسوبة ☕🎉":"انتقلت إلى: "+STAGE_AR[stage]);
+  }catch(e){d.stage=old; renderDeals(); toast("تعذر النقل: "+e.message)}
+}
+
+/* ================= المتابعات ================= */
+function renderTasks(){
+  const t0=today0();
+  const list=ACTS.filter(x=>x.next_action&&x.next_action_date)
+    .sort((a,b)=>new Date(a.next_action_date)-new Date(b.next_action_date)).slice(0,60);
+  $("tasks").innerHTML=list.length?list.map(x=>{
+    const a=accById(x.account_id); const late=new Date(x.next_action_date)<t0;
+    return `<div class="task ${late?"late":""}">
+      <div style="flex:1"><div class="tt">${esc(x.next_action)}</div>
+        <div class="td">${esc(a.name_ar||"")} · ${fmtD(x.next_action_date)}</div></div>
+      <div class="done acts">
+        <button class="btn b-ghost b-sm" onclick="openAcc(${x.account_id})">البطاقة</button>
+        <button class="btn b-wa b-sm" onclick="taskDone(${x.id??"null"},${x.account_id})">تم ✓</button>
+      </div></div>`}).join("")
+    :`<div class="empty"><div class="big">✅</div>لا متابعات معلّقة — القائمة نظيفة</div>`;
+}
+async function taskDone(id,accId){
+  try{
+    if(!DEMO&&id) await api(`crm_activities?id=eq.${id}`,{method:"PATCH",body:JSON.stringify({next_action_date:null})});
+    const x=ACTS.find(a=>a.id==id); if(x)x.next_action_date=null;
+    toast("أُنجزت المتابعة ✅"); renderTasks();
+  }catch(e){toast("تعذر التحديث: "+e.message)}
+}
+
+/* ================= إقلاع ================= */
+function openSetup(){$("setup").classList.add("on"); if(SB_KEY)$("keyIn").value=SB_KEY}
+async function saveKey(){
+  const k=$("keyIn").value.trim(); if(!k){toast("الصق المفتاح أولاً");return}
+  SB_KEY=k; DEMO=false;
+  try{ await loadAll(); store.set("awan_key",k); $("setup").classList.remove("on");
+    $("connBadge").textContent="متصل بالقاعدة ●"; $("connBadge").classList.add("live");
+    toast(`تم الاتصال — ${ACC.length} حساب`); renderToday();
+  }catch(e){ toast("فشل الاتصال: تأكد من المفتاح"); console.error(e); }
+}
+function startDemo(){DEMO=true; demoData(); $("setup").classList.remove("on");
+  $("connBadge").textContent="وضع تجريبي"; toast("نسخة تجريبية — البيانات لا تُحفظ"); renderToday();}
+(async function boot(){
+  const saved=store.get("awan_key");
+  const url=new URLSearchParams(location.search);
+  if(url.get("demo")==="1"){startDemo();return}
+  if(saved){SB_KEY=saved;
+    try{await loadAll(); $("connBadge").textContent="متصل بالقاعدة ●"; $("connBadge").classList.add("live"); renderToday(); return}
+    catch(e){console.error(e)}}
+  openSetup(); demoData(); renderToday();
+})();
+</script>
+</body>
+</html>
