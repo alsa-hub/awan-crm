@@ -255,7 +255,6 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
         <button class="btn b-ghost b-sm" style="flex:1;justify-content:center" onclick="doSignup()">إنشاء الحساب (أول مرة)</button>
         <button class="btn b-ghost b-sm" style="flex:1;justify-content:center" onclick="doRecover()">نسيت كلمة المرور</button>
       </div>
-      <button class="btn b-ghost b-sm" style="justify-content:center" onclick="startDemo()">استعراض النسخة التجريبية</button>
       <div class="mini" id="authMsg" style="text-align:center"></div>
     </div>
   </div>
@@ -265,7 +264,7 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
 const SB_URL = "https://fglzyryytvzgrmxshwyg.supabase.co";
 const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbHp5cnl5dHZ6Z3JteHNod3lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3ODkyMzcsImV4cCI6MjEwMDM2NTIzN30.MLqJdzZMyGrSPsPdB3_Xvyr_URoehY11IWYqcHjmT-c"; // مفتاح عام — القاعدة مقفلة بتسجيل الدخول
 let ACCESS="", REFRESH="", USER_EMAIL="";
-let DEMO = false;
+const DEMO=false;
 const STAGES = ["new","contacted","sample_sent","negotiation","won","lost","frozen"];
 const STAGE_AR = {new:"جديدة",contacted:"تم التواصل",sample_sent:"أُرسلت عينة",negotiation:"تفاوض",won:"مكسوبة",lost:"خاسرة",frozen:"مجمّدة"};
 const PRIOS = ["قصوى","مرتفعة","متوسطة","منخفضة"];
@@ -320,55 +319,6 @@ async function loadAll(){
   ACC=a||[]; DEALS=d||[]; ACTS=ac||[]; REVS=rv||[];
 }
 
-/* ================= بيانات تجريبية ================= */
-function demoData(){
-  const N=(n,p,dist,rev,rating,ph,notes,st="lead",seg="مستقل")=>({id:n[0],name_ar:n[1],priority:p,district:dist,reviews_count:rev,rating,phone:ph,notes,status:st,segment:seg});
-  ACC=[
-    N([1,"غندورة"],"قصوى","الغدير",1450,4.0,"0550400704","شكوى متكررة: «قهوة سيئة جداً» + كولومبي رديء. الزاوية: التفاوت بين الزيارات — بن أغتون ثابت + معايرة مجانية لـ3 فروع. تحقق: هل يحمصون بأنفسهم؟"),
-    N([2,"إم دي M DEE"],"قصوى","الياسمين",4175,4.3,"0552180070","حلاهم أسطوري (الليمون ×306) والقهوة ما توازيه. مشكلة نظامية بخط الإسبرسو والحليب. العرض: بلند باسمهم + تدريب + جدولة 24h. صفقة 600 كغ.","lead","سلسلة"),
-    N([3,"بي فاين"],"قصوى","الصحافة",980,4.2,"0561208112","«البن دائماً حامضي» — بروفايل متوازن أقل حمضية + جلسة تذوق مجانية. حساسية سعر 16 ريال."),
-    N([4,"سِّرب"],"قصوى","الرمال",1210,4.1,"0583542717","«القهوة صارت سيئة» — كانوا الأفضل ويعرفون الفرق. محاصيل إثيوبية/يمنية + جدولة 24h."),
-    N([5,"لايقر"],"قصوى","الملقا",760,4.3,"0551933933","فلات وايتهم بطل (×68) لكن سقنتشر/سبانش غير موزونة. حزمة: بن أطزج + معايرة + تطوير وصفات. لا يردون على الجوال — واتساب ثم زيارة."),
-    N([6,"درايف كوفي"],"مرتفعة","المقر الرئيسي",8270,4.4,"920010126","44 فرعاً. قهوتهم ممدوحة — لا زاوية جودة. الزاوية: توحيد الطعم بين فروع الامتياز + توريد مركزي. المالك: محمد الحازمي. 920 كغ.","lead","سلسلة"),
-    N([7,"تيلر"],"مرتفعة","أكشاك المترو",640,4.5,"0556900621","قهوة ممدوحة حتى في مراجعات النجمة الواحدة؛ المشكلة نفاد الأصناف. أقل سعر كيلو + ضمان توفر. الإدارة متجاوبة.","lead","سلسلة"),
-    N([8,"كروي بيت الخبز"],"مرتفعة","العقيق",2100,4.6,"0500000001","الفلات وايت مذكور ×192 — بلند حصري باسمهم + بروتوكول توصيل. 150 كغ."),
-    N([9,"يوليكا"],"مرتفعة","الياسمين",890,4.5,"0500000002","قهوة قوية ممدوحة؛ ثبات وقت الضغط + أكواب لا تسرب. سقف سعر 24 ريال (V60)."),
-    N([10,"كلتورا ديل"],"مرتفعة","الربيع",720,4.3,"0500000003","شكوى «صغّروا الكوب بنفس السعر» = ضغط تكلفة — سعر كيلو يرجّع الحجم بلا خسارة."),
-    N([11,"ريشيو"],"متوسطة","العليا",1600,4.4,"0500000004","V60 نقطة قوتهم. الزاوية: باتش بريو صباحي (لا قهوة حارة صباحاً!) + منع انقطاع."),
-    N([12,"Deki"],"متوسطة","الصحافة",540,4.2,"0500000005","آيس دريب 10/10؛ المشكلة نظافة معدات (بالصور) — حزمة نظافة + معايرة دورية."),
-    N([13,"ميركوري"],"منخفضة","السويدي",3100,4.0,"0500000006","شيشة ×511 — القهوة ثانوية. مؤجل."),
-    N([14,"أربول"],"منخفضة","النرجس",430,3.9,"0500000007","مشاكل تشغيل أعمق من القهوة. مؤجل."),
-  ];
-  DEALS=[
-    {id:1,account_id:2,stage:"contacted",expected_monthly_kg:600,probability:35},
-    {id:2,account_id:6,stage:"new",expected_monthly_kg:920,probability:20},
-    {id:3,account_id:1,stage:"sample_sent",expected_monthly_kg:120,probability:55},
-    {id:4,account_id:4,stage:"sample_sent",expected_monthly_kg:50,probability:60},
-    {id:5,account_id:3,stage:"negotiation",expected_monthly_kg:60,probability:70},
-    {id:6,account_id:8,stage:"contacted",expected_monthly_kg:150,probability:40},
-    {id:7,account_id:7,stage:"new",expected_monthly_kg:80,probability:25},
-    {id:8,account_id:5,stage:"won",expected_monthly_kg:40,probability:100},
-  ];
-  const d=off=>{const x=new Date();x.setDate(x.getDate()+off);return x.toISOString().slice(0,10)};
-  ACTS=[
-    {id:1,account_id:1,activity_type:"call",notes:"مهتم بالمعايرة المجانية",next_action:"إرسال عينة أغتون لفرع الغدير",next_action_date:d(-2)},
-    {id:2,account_id:2,activity_type:"call",notes:"وصلنا لمسؤول التشغيل",next_action:"اجتماع تجربة عمياء على فرعين",next_action_date:d(0)},
-    {id:3,account_id:4,activity_type:"whatsapp",notes:"أعجبتهم فكرة محاصيل زمان",next_action:"متابعة رأيهم بالعينة الإثيوبية",next_action_date:d(1)},
-    {id:4,account_id:6,activity_type:"call",notes:"سكرتير المقر حوّلنا للمشتريات",next_action:"اتصال بالمشتريات — الثلاثاء",next_action_date:d(3)},
-    {id:5,account_id:5,activity_type:"visit",notes:"جلسة تطوير وصفات ناجحة",next_action:"توقيع أول طلبية شهرية",next_action_date:d(-1)},
-  ];
-  REVS=[
-    {account_id:1,rating:1,excerpt:"قهوة سيئة جداً وما تستاهل السعر، الكولومبي بلا طعم",complaint_tags:["جودة البن","السعر مقابل القيمة"],review_date_text:"قبل شهر"},
-    {account_id:1,rating:2,excerpt:"كل زيارة طعم مختلف، مرة ممتازة ومرة ما تنشرب",complaint_tags:["عدم الثبات"],review_date_text:"قبل 3 أسابيع"},
-    {account_id:2,rating:2,excerpt:"الحلا أسطوري بس اللاتيه محروق، والتوصيل وصل بن محترق",complaint_tags:["حليب محروق","التوصيل"],review_date_text:"قبل أسبوعين"},
-    {account_id:2,rating:1,excerpt:"أسوأ كابتشينو جربته — وهذا ثاني فرع أجربه",complaint_tags:["مشروبات الحليب"],review_date_text:"قبل شهر"},
-    {account_id:3,rating:3,excerpt:"المكان مرتب بس البن دائماً حامضي",complaint_tags:["حموضة عالية"],review_date_text:"قبل أسبوع"},
-    {account_id:4,rating:2,excerpt:"القهوة صارت سيئة، وين أيامكم الأولى؟ نبي التحسين",complaint_tags:["تراجع الجودة"],review_date_text:"قبل 10 أيام"},
-    {account_id:5,rating:5,excerpt:"الفلات وايت عندهم بطل، بس السقنتشر مو موزون",complaint_tags:["مشروبات مركبة"],review_date_text:"قبل أسبوع"},
-    {account_id:6,rating:5,excerpt:"قهوتهم ثابتة وطعمها ممتاز، أفضل درايف ثرو",complaint_tags:null,review_date_text:"قبل 5 أيام"},
-    {account_id:7,rating:1,excerpt:"القهوة ممتازة بس نص الأصناف مقطوعة دايماً",complaint_tags:["نفاد الأصناف"],review_date_text:"قبل أسبوعين"},
-  ];
-}
 /* ================= أدوات ================= */
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
@@ -643,11 +593,7 @@ async function doRecover(){
   const e=$("emailIn").value.trim(); if(!e){authMsg("اكتب إيميلك أولاً");return}
   try{await authPost("recover",{email:e}); authMsg("أرسلنا رابط استعادة كلمة المرور لإيميلك")}
   catch(x){authMsg(x.message)}}
-function startDemo(){DEMO=true; demoData(); $("setup").classList.remove("on");
-  $("connBadge").textContent="وضع تجريبي"; toast("نسخة تجريبية — البيانات لا تُحفظ"); renderToday();}
 (async function boot(){
-  const url=new URLSearchParams(location.search);
-  if(url.get("demo")==="1"){startDemo();return}
   REFRESH=store.get("awan_rt")||"";
   if(REFRESH && await refreshSession()){
     try{await enter(); return}catch(e){console.error(e)}}
