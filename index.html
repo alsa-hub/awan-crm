@@ -229,6 +229,12 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
   <div class="sub">المتأخر أولاً — لا تترك متابعة تبرد مثل القهوة</div>
   <div id="tasks"></div>
 </section>
+<!-- ======== الإدارة ======== -->
+<section class="screen" id="scr-admin">
+  <h2 class="scr">إدارة الفريق</h2>
+  <div class="sub">اعتمد المندوبين الجدد وأدر الأدوار — الاعتماد يؤكد إيميلهم تلقائياً</div>
+  <div id="adminList"></div>
+</section>
 </main>
 
 <nav>
@@ -236,6 +242,7 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
   <button data-s="dash" onclick="go('dash',this)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>اللوحة</button>
   <button data-s="acc" onclick="go('acc',this)"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>الحسابات</button>
   <button data-s="deals" onclick="go('deals',this)"><svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>الصفقات</button>
+  <button data-s="admin" id="navAdmin" style="display:none" onclick="go('admin',this)"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>الإدارة</button>
   <button data-s="tasks" onclick="go('tasks',this)"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>المتابعات</button>
 </nav>
 
@@ -248,7 +255,8 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
     <div class="logo">أوان</div>
     <p>سجّل دخولك لمنظومة المبيعات</p>
     <div class="frm">
-      <input class="inp" id="emailIn" dir="ltr" type="email" autocomplete="username" placeholder="الإيميل" value="Bnr@hotmail.co.uk" style="text-align:center">
+      <input class="inp" id="emailIn" dir="ltr" type="email" autocomplete="username" placeholder="الإيميل" style="text-align:center">
+      <input class="inp" id="nameIn" type="text" placeholder="الاسم — للتسجيل الجديد فقط" style="text-align:center">
       <input class="inp" id="passIn" dir="ltr" type="password" autocomplete="current-password" placeholder="كلمة المرور" style="text-align:center">
       <button class="btn b-call" style="justify-content:center" onclick="doLogin()">دخول</button>
       <div style="display:flex;gap:8px">
@@ -308,6 +316,43 @@ async function refreshSession(){
   try{const d=await authPost("token?grant_type=refresh_token",{refresh_token:REFRESH}); setSession(d); return true}
   catch(e){ACCESS="";REFRESH="";store.set("awan_rt","");return false}}
 function logout(){ACCESS="";REFRESH="";USER_EMAIL="";store.set("awan_rt","");location.reload();}
+let ME=null;
+const jwtPayload=t=>{try{return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch(e){return{}}};
+async function authGet(path){const r=await fetch(SB_URL+"/auth/v1/"+path,{headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS}});
+  const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(AR_AUTH_ERR(d.msg||d.error_description||"خطأ")); return d}
+async function authDel(path){const r=await fetch(SB_URL+"/auth/v1/"+path,{method:"DELETE",headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS}});
+  if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(AR_AUTH_ERR(d.msg||"خطأ"))}}
+async function fetchMe(){const uid=jwtPayload(ACCESS).sub;
+  const rows=await api(`app_users?select=*&id=eq.${uid}`); return rows?.[0]||null}
+function showGate(icon,title,text){
+  $("setup").classList.add("on");
+  document.querySelector("#setup .bx").innerHTML=`<div class="logo">أوان</div>
+    <div class="empty"><div class="big">${icon}</div><b>${title}</b><br><span class="mini">${text}</span></div>
+    <div class="frm"><button class="btn b-ghost" style="justify-content:center" onclick="logout()">خروج</button></div>`;}
+function mfaPrompt(fid){return new Promise(res=>{
+  $("setup").classList.add("on");
+  document.querySelector("#setup .bx").innerHTML=`<div class="logo">أوان</div>
+    <p>أدخل رمز التحقق من تطبيق المصادقة</p>
+    <div class="frm"><input class="inp" id="mfaCode" dir="ltr" inputmode="numeric" maxlength="6" placeholder="⬚⬚⬚⬚⬚⬚" style="text-align:center;font-size:22px;letter-spacing:8px">
+    <button class="btn b-call" style="justify-content:center" onclick="_mfaGo()">تحقق</button>
+    <div class="mini" id="mfaMsg" style="text-align:center"></div></div>`;
+  window._mfaGo=async()=>{try{
+    const ch=await authPost(`factors/${fid}/challenge`,{});
+    const d=await authPost(`factors/${fid}/verify`,{challenge_id:ch.id,code:$("mfaCode").value.trim()});
+    setSession(d); res();
+  }catch(e){$("mfaMsg").textContent=/invalid/i.test(e.message)?"رمز غير صحيح — حاول من جديد":e.message}};
+  setTimeout(()=>$("mfaCode")?.focus(),100);
+})}
+async function postLogin(){
+  const u=await authGet("user"); USER_EMAIL=u.email;
+  const f=(u.factors||[]).find(x=>x.status==="verified");
+  if(f && jwtPayload(ACCESS).aal!=="aal2") await mfaPrompt(f.id);
+  ME=await fetchMe();
+  if(!ME){showGate("⚠️","تعذر جلب ملفك","حدّث الصفحة وحاول من جديد");return}
+  if(ME.status==="pending"){showGate("⏳","حسابك بانتظار الاعتماد","بلّغ مدير أوان يعتمدك من شاشة الإدارة، ثم سجّل دخولك من جديد");return}
+  if(ME.status==="disabled"){showGate("🚫","حسابك موقوف","تواصل مع مدير أوان");return}
+  await enter();
+}
 
 async function loadAll(){
   const [a,d,ac,rv] = await Promise.all([
@@ -339,7 +384,7 @@ function fmtD(s){if(!s)return"";const d=new Date(s);const diff=Math.round((d-tod
 function go(s,btn){document.querySelectorAll(".screen").forEach(e=>e.classList.remove("on"));
   $("scr-"+s).classList.add("on");
   document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b===btn));
-  ({today:renderToday,dash:renderDash,acc:renderAccounts,deals:renderDeals,tasks:renderTasks}[s])();}
+  ({today:renderToday,dash:renderDash,acc:renderAccounts,deals:renderDeals,tasks:renderTasks,admin:renderAdmin}[s])();}
 
 /* ================= اليوم ================= */
 function renderToday(){
@@ -571,23 +616,87 @@ function openSetup(){$("setup").classList.add("on")}
 function authMsg(m){$("authMsg").textContent=m}
 async function enter(){
   await loadAll(); $("setup").classList.remove("on");
-  $("connBadge").textContent=USER_EMAIL?USER_EMAIL.split("@")[0]+" ●":"متصل ●";
-  $("connBadge").classList.add("live"); $("connBadge").onclick=()=>{if(confirm("تسجيل الخروج؟"))logout()};
+  $("connBadge").textContent=(ME?.full_name||USER_EMAIL.split("@")[0])+" ●";
+  $("connBadge").classList.add("live"); $("connBadge").onclick=openProfile;
+  if(ME?.role==="admin") $("navAdmin").style.display="flex";
   renderToday();}
+/* ---- حسابي + MFA ---- */
+async function openProfile(){
+  let f=[]; try{f=(await authGet("user")).factors||[]}catch(e){}
+  const vf=f.find(x=>x.status==="verified");
+  openSheet(`<div class="sh-name">حسابي</div>
+    <div class="sh-meta">${esc(USER_EMAIL)} · ${ME?.role==="admin"?"مدير":"مندوب"}</div>
+    <div class="sh-sec">التحقق الثنائي (MFA)</div>
+    ${vf?`<div class="rev good">مفعّل ✅ — يُطلب رمز من تطبيق المصادقة عند كل دخول</div>
+      <button class="btn b-red b-sm" onclick="mfaRemove('${vf.id}')">إلغاء التفعيل</button>`
+    :`<div class="rev">غير مفعّل — فعّله لحماية أقوى: يربط حسابك بتطبيق مصادقة (Google Authenticator أو مشابه)</div>
+      <button class="btn b-amber b-sm" onclick="mfaEnroll()">تفعيل التحقق الثنائي</button>`}
+    <div class="sh-sec">الجلسة</div>
+    <button class="btn b-ghost b-sm" onclick="logout()">تسجيل الخروج</button>`);}
+async function mfaEnroll(){
+  try{
+    const d=await authPost("factors",{factor_type:"totp",friendly_name:"awan-crm"});
+    openSheet(`<div class="sh-name">تفعيل التحقق الثنائي</div>
+      <div class="sh-meta">امسح الرمز بتطبيق المصادقة ثم أدخل الرمز الظاهر فيه</div>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;justify-content:center">${d.totp.qr_code}</div>
+      <div class="mini" style="margin:8px 0;text-align:center;direction:ltr;word-break:break-all">أو أدخل المفتاح يدوياً: ${esc(d.totp.secret)}</div>
+      <div class="frm"><input class="inp" id="enCode" dir="ltr" inputmode="numeric" maxlength="6" placeholder="⬚⬚⬚⬚⬚⬚" style="text-align:center;font-size:20px;letter-spacing:8px">
+      <button class="btn b-call" style="justify-content:center" onclick="mfaConfirm('${d.id}')">تأكيد التفعيل</button>
+      <div class="mini" id="enMsg" style="text-align:center"></div></div>`);
+  }catch(e){toast(e.message)}}
+async function mfaConfirm(fid){
+  try{
+    const ch=await authPost(`factors/${fid}/challenge`,{});
+    const d=await authPost(`factors/${fid}/verify`,{challenge_id:ch.id,code:$("enCode").value.trim()});
+    setSession(d); closeSheet(); toast("التحقق الثنائي مفعّل 🔐");
+  }catch(e){$("enMsg").textContent=/invalid/i.test(e.message)?"رمز غير صحيح":e.message}}
+async function mfaRemove(fid){
+  if(!confirm("إلغاء التحقق الثنائي؟"))return;
+  try{await authDel(`factors/${fid}`); closeSheet(); toast("أُلغي التحقق الثنائي");}
+  catch(e){toast(e.message)}}
+/* ---- شاشة الإدارة ---- */
+async function renderAdmin(){
+  const us=await api("app_users?select=*&order=created_at.desc").catch(e=>{toast(e.message);return[]});
+  const ROLE={admin:"مدير",rep:"مندوب"}, ST={pending:["بانتظار الاعتماد","t-lead"],approved:["معتمد","t-cust"],disabled:["موقوف","t-x"]};
+  $("adminList").innerHTML=(us||[]).map(u=>{
+    const [stTxt,stCls]=ST[u.status]||[u.status,"t-x"]; const self=u.id===jwtPayload(ACCESS).sub;
+    return `<div class="card" style="margin-bottom:9px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0"><b>${esc(u.full_name||u.email.split("@")[0])}</b>
+          <div class="mini" dir="ltr" style="text-align:right">${esc(u.email)}</div></div>
+        <span class="tag ${stCls}">${stTxt}</span><span class="tag t-lead">${ROLE[u.role]||u.role}</span></div>
+      <div class="acts" style="margin-top:10px">
+        ${u.status!=="approved"?`<button class="btn b-wa b-sm" onclick="adminOp('approve','${u.id}')">اعتماد ✓</button>`:""}
+        ${u.status==="approved"&&!self?`<button class="btn b-red b-sm" onclick="adminOp('disable','${u.id}')">إيقاف</button>`:""}
+        ${u.role==="rep"?`<button class="btn b-ghost b-sm" onclick="adminOp('make_admin','${u.id}')">ترقية لمدير</button>`:""}
+        ${u.role==="admin"&&!self?`<button class="btn b-ghost b-sm" onclick="adminOp('make_rep','${u.id}')">تحويل لمندوب</button>`:""}
+        ${self?`<span class="mini">هذا حسابك</span>`:""}
+      </div></div>`;}).join("")||`<div class="empty"><div class="big">👥</div>لا مستخدمين بعد</div>`;}
+async function adminOp(action,id){
+  try{
+    const r=await fetch(SB_URL+"/functions/v1/admin-ops",{method:"POST",
+      headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS,"Content-Type":"application/json"},
+      body:JSON.stringify({action,user_id:id})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||d.error)throw new Error(d.error||"فشل التنفيذ");
+    toast({approve:"اعتُمد وأُكّد إيميله ✅",disable:"أُوقف الحساب",make_admin:"رُقّي لمدير",make_rep:"حُوّل لمندوب"}[action]);
+    renderAdmin();
+  }catch(e){toast(e.message)}}
 async function doLogin(){
   const e=$("emailIn").value.trim(), p=$("passIn").value;
   if(!e||!p){authMsg("اكتب الإيميل وكلمة المرور");return}
   authMsg("جاري الدخول…");
   try{const d=await authPost("token?grant_type=password",{email:e,password:p});
-    setSession(d); USER_EMAIL=e; await enter(); toast("أهلاً بك ☕");
+    setSession(d); await postLogin(); toast("أهلاً بك ☕");
   }catch(x){authMsg(x.message)}}
 async function doSignup(){
   const e=$("emailIn").value.trim(), p=$("passIn").value;
   if(!e||!p){authMsg("اكتب الإيميل واختر كلمة مرور (6+ أحرف)");return}
   authMsg("جاري إنشاء الحساب…");
-  try{const d=await authPost("signup",{email:e,password:p});
-    if(d.access_token){setSession(d); USER_EMAIL=e; await enter(); toast("أنشئ الحساب وسجّل دخولك ☕")}
-    else authMsg("أرسلنا رابط تأكيد لإيميلك — افتحه ثم ارجع اضغط دخول");
+  const nm=$("nameIn").value.trim();
+  try{const d=await authPost("signup",{email:e,password:p,data:{full_name:nm}});
+    if(d.access_token){setSession(d); await postLogin()}
+    else authMsg("تم التسجيل ✅ حسابك الآن بانتظار اعتماد المدير — بعد اعتماده سجّل دخولك مباشرة");
   }catch(x){authMsg(x.message)}}
 async function doRecover(){
   const e=$("emailIn").value.trim(); if(!e){authMsg("اكتب إيميلك أولاً");return}
@@ -596,7 +705,7 @@ async function doRecover(){
 (async function boot(){
   REFRESH=store.get("awan_rt")||"";
   if(REFRESH && await refreshSession()){
-    try{await enter(); return}catch(e){console.error(e)}}
+    try{await postLogin(); return}catch(e){console.error(e)}}
   openSetup();
 })();
 </script>
