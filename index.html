@@ -246,19 +246,25 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
 <div id="setup">
   <div class="bx">
     <div class="logo">أوان</div>
-    <p>اربط الشاشة بقاعدة بياناتك في Supabase<br>أو جرّب النسخة التجريبية ببيانات واقعية</p>
+    <p>سجّل دخولك لمنظومة المبيعات</p>
     <div class="frm">
-      <input class="inp" id="keyIn" dir="ltr" placeholder="Supabase anon key — الصق المفتاح هنا" style="font-size:12px">
-      <button class="btn b-call" style="justify-content:center" onclick="saveKey()">اتصال مباشر بالقاعدة</button>
-      <button class="btn b-ghost" style="justify-content:center" onclick="startDemo()">جرّب النسخة التجريبية</button>
-      <div class="mini" style="text-align:center">المفتاح: Supabase → Settings → API Keys → anon public</div>
+      <input class="inp" id="emailIn" dir="ltr" type="email" autocomplete="username" placeholder="الإيميل" value="Bnr@hotmail.co.uk" style="text-align:center">
+      <input class="inp" id="passIn" dir="ltr" type="password" autocomplete="current-password" placeholder="كلمة المرور" style="text-align:center">
+      <button class="btn b-call" style="justify-content:center" onclick="doLogin()">دخول</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn b-ghost b-sm" style="flex:1;justify-content:center" onclick="doSignup()">إنشاء الحساب (أول مرة)</button>
+        <button class="btn b-ghost b-sm" style="flex:1;justify-content:center" onclick="doRecover()">نسيت كلمة المرور</button>
+      </div>
+      <button class="btn b-ghost b-sm" style="justify-content:center" onclick="startDemo()">استعراض النسخة التجريبية</button>
+      <div class="mini" id="authMsg" style="text-align:center"></div>
     </div>
   </div>
 </div>
 <script>
 /* ================= إعدادات ================= */
 const SB_URL = "https://fglzyryytvzgrmxshwyg.supabase.co";
-let SB_KEY = "";            // يُحفظ محلياً بعد أول إدخال
+const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnbHp5cnl5dHZ6Z3JteHNod3lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3ODkyMzcsImV4cCI6MjEwMDM2NTIzN30.MLqJdzZMyGrSPsPdB3_Xvyr_URoehY11IWYqcHjmT-c"; // مفتاح عام — القاعدة مقفلة بتسجيل الدخول
+let ACCESS="", REFRESH="", USER_EMAIL="";
 let DEMO = false;
 const STAGES = ["new","contacted","sample_sent","negotiation","won","lost","frozen"];
 const STAGE_AR = {new:"جديدة",contacted:"تم التواصل",sample_sent:"أُرسلت عينة",negotiation:"تفاوض",won:"مكسوبة",lost:"خاسرة",frozen:"مجمّدة"};
@@ -271,17 +277,38 @@ let ACC=[], DEALS=[], ACTS=[], REVS=[];
 let accFilter="الكل", todayFilter="الكل";
 
 /* ================= REST ================= */
-async function api(path, opts={}){
+async function api(path, opts={}, retried){
   if(DEMO) throw new Error("demo");
   const r = await fetch(SB_URL + "/rest/v1/" + path, {
     ...opts,
-    headers:{apikey:SB_KEY, Authorization:"Bearer "+SB_KEY,
+    headers:{apikey:SB_ANON, Authorization:"Bearer "+(ACCESS||SB_ANON),
              "Content-Type":"application/json", Prefer:"return=representation", ...(opts.headers||{})}
   });
+  if(r.status===401 && REFRESH && !retried){ const ok=await refreshSession(); if(ok) return api(path,opts,true); }
   if(!r.ok){ const t = await r.text(); throw new Error(t.slice(0,300)); }
   const txt = await r.text();
   return txt ? JSON.parse(txt) : null;
 }
+/* ---- مصادقة ---- */
+const AR_AUTH_ERR=m=>{
+  if(/invalid login|invalid_credentials/i.test(m)) return "الإيميل أو كلمة المرور غير صحيحة";
+  if(/email not confirmed/i.test(m)) return "أكّد إيميلك أولاً — افتح رسالة التأكيد في بريدك ثم ارجع سجّل دخول";
+  if(/already registered|user already exists/i.test(m)) return "الحساب موجود — استخدم زر الدخول";
+  if(/at least 6|password should/i.test(m)) return "كلمة المرور قصيرة — 6 أحرف على الأقل";
+  if(/rate limit|security purposes/i.test(m)) return "محاولات كثيرة — انتظر دقيقة وحاول";
+  return m;};
+async function authPost(path, body){
+  const r=await fetch(SB_URL+"/auth/v1/"+path,{method:"POST",
+    headers:{apikey:SB_ANON,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(AR_AUTH_ERR(d.error_description||d.msg||d.message||JSON.stringify(d).slice(0,150)));
+  return d;}
+function setSession(d){ACCESS=d.access_token; REFRESH=d.refresh_token; USER_EMAIL=d.user?.email||USER_EMAIL;
+  store.set("awan_rt",REFRESH);}
+async function refreshSession(){
+  try{const d=await authPost("token?grant_type=refresh_token",{refresh_token:REFRESH}); setSession(d); return true}
+  catch(e){ACCESS="";REFRESH="";store.set("awan_rt","");return false}}
+function logout(){ACCESS="";REFRESH="";USER_EMAIL="";store.set("awan_rt","");location.reload();}
 
 async function loadAll(){
   const [a,d,ac,rv] = await Promise.all([
@@ -590,25 +617,41 @@ async function refreshData(){
     go(on?.dataset.s||"today",on);
   }catch(e){toast("تعذر التحديث: "+e.message)}
 }
-function openSetup(){$("setup").classList.add("on"); if(SB_KEY)$("keyIn").value=SB_KEY}
-async function saveKey(){
-  const k=$("keyIn").value.trim(); if(!k){toast("الصق المفتاح أولاً");return}
-  SB_KEY=k; DEMO=false;
-  try{ await loadAll(); store.set("awan_key",k); $("setup").classList.remove("on");
-    $("connBadge").textContent="متصل بالقاعدة ●"; $("connBadge").classList.add("live");
-    toast(`تم الاتصال — ${ACC.length} حساب`); renderToday();
-  }catch(e){ toast("فشل الاتصال: تأكد من المفتاح"); console.error(e); }
-}
+function openSetup(){$("setup").classList.add("on")}
+function authMsg(m){$("authMsg").textContent=m}
+async function enter(){
+  await loadAll(); $("setup").classList.remove("on");
+  $("connBadge").textContent=USER_EMAIL?USER_EMAIL.split("@")[0]+" ●":"متصل ●";
+  $("connBadge").classList.add("live"); $("connBadge").onclick=()=>{if(confirm("تسجيل الخروج؟"))logout()};
+  renderToday();}
+async function doLogin(){
+  const e=$("emailIn").value.trim(), p=$("passIn").value;
+  if(!e||!p){authMsg("اكتب الإيميل وكلمة المرور");return}
+  authMsg("جاري الدخول…");
+  try{const d=await authPost("token?grant_type=password",{email:e,password:p});
+    setSession(d); USER_EMAIL=e; await enter(); toast("أهلاً بك ☕");
+  }catch(x){authMsg(x.message)}}
+async function doSignup(){
+  const e=$("emailIn").value.trim(), p=$("passIn").value;
+  if(!e||!p){authMsg("اكتب الإيميل واختر كلمة مرور (6+ أحرف)");return}
+  authMsg("جاري إنشاء الحساب…");
+  try{const d=await authPost("signup",{email:e,password:p});
+    if(d.access_token){setSession(d); USER_EMAIL=e; await enter(); toast("أنشئ الحساب وسجّل دخولك ☕")}
+    else authMsg("أرسلنا رابط تأكيد لإيميلك — افتحه ثم ارجع اضغط دخول");
+  }catch(x){authMsg(x.message)}}
+async function doRecover(){
+  const e=$("emailIn").value.trim(); if(!e){authMsg("اكتب إيميلك أولاً");return}
+  try{await authPost("recover",{email:e}); authMsg("أرسلنا رابط استعادة كلمة المرور لإيميلك")}
+  catch(x){authMsg(x.message)}}
 function startDemo(){DEMO=true; demoData(); $("setup").classList.remove("on");
   $("connBadge").textContent="وضع تجريبي"; toast("نسخة تجريبية — البيانات لا تُحفظ"); renderToday();}
 (async function boot(){
-  const saved=store.get("awan_key");
   const url=new URLSearchParams(location.search);
   if(url.get("demo")==="1"){startDemo();return}
-  if(saved){SB_KEY=saved;
-    try{await loadAll(); $("connBadge").textContent="متصل بالقاعدة ●"; $("connBadge").classList.add("live"); renderToday(); return}
-    catch(e){console.error(e)}}
-  openSetup(); demoData(); renderToday();
+  REFRESH=store.get("awan_rt")||"";
+  if(REFRESH && await refreshSession()){
+    try{await enter(); return}catch(e){console.error(e)}}
+  openSetup();
 })();
 </script>
 </body>
