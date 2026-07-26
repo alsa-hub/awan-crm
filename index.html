@@ -849,7 +849,7 @@ async function logResult(id,i){
   const [label,next,days]=window._opts[i];
   const note=($("logNote")?.value||"").trim();
   const a=accById(id);
-  // التقاط الاستخبارات
+  // التقاط بيانات السوق
   const sup=($("inSupplier")?.value||"").trim();
   const pr=parseFloat($("inPrice")?.value)||null;
   const kg=parseFloat($("inKg")?.value)||null;
