@@ -658,7 +658,11 @@ function suggestAccount(){
         <input class="inp" id="sgDist" placeholder="الحي">
         <input class="inp" id="sgPhone" dir="ltr" inputmode="tel" placeholder="الهاتف">
       </div>
-      <textarea class="ta" id="sgNotes" rows="2" placeholder="ملاحظات — وش شفت؟ منو موردهم؟"></textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input class="inp" id="sgSupplier" placeholder="🎯 موردهم الحالي؟">
+        <input class="inp" id="sgPrice" type="number" inputmode="decimal" placeholder="سعر الكيلو (ريال)؟">
+      </div>
+      <textarea class="ta" id="sgNotes" rows="2" placeholder="ملاحظات — وش شفت؟ الزاوية البيعية؟"></textarea>
       <button class="btn b-call" style="justify-content:center" onclick="saveSuggested()">${admin?"إضافة الحساب":"إرسال الاقتراح"}</button>
     </div>`);}
 async function saveSuggested(){
@@ -666,6 +670,9 @@ async function saveSuggested(){
   const admin=ME?.role==="admin";
   const row={name_ar:name,district:$("sgDist").value.trim()||null,phone:$("sgPhone").value.trim()||null,
     notes:$("sgNotes").value.trim()||null,priority:"متوسطة",
+    current_supplier:$("sgSupplier").value.trim()||null,
+    supplier_price_per_kg:parseFloat($("sgPrice").value)||null,
+    intel_updated_at:($("sgSupplier").value.trim()||$("sgPrice").value)?new Date().toISOString():null,
     status:admin?"lead":"suggested",assigned_to:admin?null:ME.id};
   try{const r=await api("crm_accounts",{method:"POST",body:JSON.stringify(row)});
     ACC.unshift(r?.[0]||row); closeSheet();
