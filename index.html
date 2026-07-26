@@ -185,6 +185,15 @@ input.search:focus,textarea.ta:focus,input.inp:focus{border-color:var(--amber)}
 .rev .tags{margin-top:4px; display:flex; flex-wrap:wrap; gap:4px}
 .rev .tg{font-size:9.5px; background:var(--red-soft); color:var(--red); border-radius:6px; padding:1px 7px}
 .frm{display:flex; flex-direction:column; gap:9px; margin-top:8px}
+/* ---------- Profile chips ---------- */
+.pf-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.pf-chips .chip{padding:5px 11px;font-size:11.5px}
+.pf-chips .chip.on{background:var(--roast);border-color:var(--roast);color:#fff}
+details.pf{border:1px dashed var(--gold-line);border-radius:12px;padding:9px 12px;margin-bottom:9px;background:#FDFAF3}
+details.pf summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--roast);list-style:none}
+details.pf summary::before{content:"＋ ";color:var(--amber)}
+details.pf[open] summary::before{content:"− "}
+.pf-lbl{font-size:10.5px;font-weight:700;color:#8a7a66;margin-top:9px}
 /* ---------- toast / setup ---------- */
 #toast{position:fixed; bottom:calc(84px + env(safe-area-inset-bottom)); right:50%; transform:translateX(50%) translateY(18px);
   background:var(--roast-deep); color:#F0DFBF; font-size:13px; padding:10px 18px; border-radius:12px; z-index:120; opacity:0; transition:.25s; pointer-events:none; max-width:88vw; text-align:center}
@@ -222,6 +231,8 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
   <div class="sub" id="dashDate"></div>
   <div class="kpis" id="kpis"></div>
   <div class="card" id="teamCard" style="display:none"><h3>أداء الفريق — آخر ٧ أيام</h3><div id="teamPerf"></div></div>
+  <div class="card" id="pounceCard" style="display:none"><h3>🎯 نافذة الانقضاض — عقود منافسين تنتهي</h3><div id="pounceList"></div></div>
+  <div class="card" id="tasteCard" style="display:none"><h3>☕ وش يشرب السوق</h3><div id="tasteMap"></div></div>
   <div class="card" id="intelCard"><h3>خريطة أسعار السوق 🎯</h3><div id="intelMap"></div></div>
   <div class="card"><h3>آخر النشاط</h3><div class="feed" id="actFeed"></div></div>
   <div class="card"><h3>خط الصفقات (كغ/شهر)</h3><div class="bars" id="chPipe"></div></div>
@@ -500,7 +511,7 @@ function renderDash(){
   const prm=Math.max(...pr.map(x=>x.v),1);
   const pc={"قصوى":"var(--p1)","مرتفعة":"var(--p2)","متوسطة":"var(--p3)","منخفضة":"var(--p4)"};
   $("chPrio").innerHTML=pr.map(x=>bar(x.p,x.v,prm,pc[x.p])).join("");
-  renderTeam(); renderFeed(); renderIntel();
+  renderTeam(); renderFeed(); renderIntel(); renderTaste(); renderPounce();
   const dm={}; ACC.filter(isOpenAcc).forEach(a=>{if(a.district)dm[a.district]=(dm[a.district]||0)+1});
   const ds=Object.entries(dm).sort((a,b)=>b[1]-a[1]).slice(0,7);
   const dmx=Math.max(...ds.map(x=>x[1]),1);
@@ -562,6 +573,39 @@ function renderIntel(){
   const totKg=ACC.reduce((s,a)=>s+(+a.monthly_kg_estimate||0),0);
   if(totKg)html+=`<div class="legend"><span>إجمالي الاستهلاك المرصود في السوق: <b class="num">${Math.round(totKg).toLocaleString("en")}</b> كغ/شهر</span></div>`;
   $("intelMap").innerHTML=html;
+}
+function renderTaste(){
+  const withPf=ACC.filter(a=>a.drink_profile||a.origins?.length||a.fast_mover||a.rare_buyer);
+  if(!withPf.length){$("tasteCard").style.display="none";return}
+  $("tasteCard").style.display="block";
+  const cnt=(arr)=>{const m={};arr.forEach(v=>{if(v)m[v]=(m[v]||0)+1});return Object.entries(m).sort((x,y)=>y[1]-x[1])};
+  let html="";
+  const og=cnt(ACC.flatMap(a=>a.origins||[]));
+  if(og.length){const mx=og[0][1];
+    html+=`<div class="pf-lbl" style="margin-top:0">الأصول المطلوبة في السوق</div><div class="bars">`+og.map(([k,v])=>bar(k,v,mx)).join("")+`</div>`}
+  const dp=cnt(ACC.map(a=>a.drink_profile));
+  if(dp.length){const mx=dp[0][1];
+    html+=`<div class="pf-lbl">طابع الاستهلاك</div><div class="bars">`+dp.map(([k,v])=>bar(k,v,mx)).join("")+`</div>`}
+  const fm=cnt(ACC.map(a=>a.fast_mover));
+  if(fm.length){const mx=fm[0][1];
+    html+=`<div class="pf-lbl">الأصناف سريعة النفاد</div><div class="bars">`+fm.map(([k,v])=>bar(k,v,mx)).join("")+`</div>`}
+  const rare=ACC.filter(a=>a.rare_buyer);
+  if(rare.length)html+=`<div class="legend"><span>💎 شريحة النادر: <b class="num">${rare.length}</b> مقهى — هامش ١٥٠+ ر/كغ: ${rare.slice(0,5).map(a=>esc(a.name_ar)).join("، ")}${rare.length>5?"…":""}</span></div>`;
+  $("tasteMap").innerHTML=html;
+}
+function renderPounce(){
+  const soon=ACC.filter(a=>a.contract_end&&isOpenAcc(a))
+    .map(a=>({a,d:Math.round((new Date(a.contract_end)-today0())/864e5)}))
+    .filter(x=>x.d<=90).sort((x,y)=>x.d-y.d).slice(0,8);
+  if(!soon.length){$("pounceCard").style.display="none";return}
+  $("pounceCard").style.display="block";
+  $("pounceList").innerHTML=soon.map(({a,d})=>`<div class="task ${d<=30?"late":""}" style="margin-bottom:7px">
+    <div style="flex:1"><div class="tt">${esc(a.name_ar)}</div>
+      <div class="td">${a.current_supplier?`موردهم: ${esc(a.current_supplier)} · `:""}العقد ينتهي ${d<0?`<b style="color:var(--red)">منتهٍ منذ ${-d} يوم</b>`:d===0?"<b>اليوم</b>":`خلال <b class="num">${d}</b> يوم`}</div></div>
+    <div class="done acts">
+      <a class="btn b-call b-sm" href="tel:${digits(a.phone)}">اتصال</a>
+      <button class="btn b-ghost b-sm" onclick="openAcc(${a.a?undefined:''}${a.id})">البطاقة</button>
+    </div></div>`).join("");
 }
 function renderFeed(){
   const list=[...ACTS].filter(x=>x.created_at)
@@ -630,6 +674,14 @@ function openAcc(id){
         ${a.monthly_kg_estimate?` · الاستهلاك: <b class="num">${a.monthly_kg_estimate}</b> كغ/شهر`:""}
         ${a.intel_updated_at?`<div class="rr">آخر تحديث: ${timeAgo(a.intel_updated_at)}</div>`:""}
       </div>`:""}
+    ${(a.drink_profile||a.origins?.length||a.fast_mover||a.rare_buyer||a.decision_maker||a.contract_end)?`<div class="sh-sec">بروفايل المقهى ☕</div>
+      <div class="rev" style="border-inline-start-color:var(--green)">
+        ${a.drink_profile?`<b>${esc(a.drink_profile)}</b>`:""}
+        ${a.origins?.length?` · أصول: <b>${a.origins.map(esc).join("، ")}</b>`:""}
+        ${a.fast_mover?` · ينفد بسرعة: <b>${esc(a.fast_mover)}</b>`:""}
+        ${a.rare_buyer?` · 💎 يشترون النادر`:""}
+        ${a.decision_maker?`<div class="rr">القرار عند: ${esc(a.decision_maker)}${a.contract_end?` · عقد موردهم ينتهي ${fmtD(a.contract_end)}`:""}</div>`:a.contract_end?`<div class="rr">عقد موردهم ينتهي ${fmtD(a.contract_end)}</div>`:""}
+      </div>`:""}
     ${a.notes?`<div class="sh-sec">الزاوية البيعية</div><div class="q p-${a.priority||""}" style="margin:0"><div class="angle" style="margin:0">${esc(a.notes)}</div></div>`:""}
     ${revs.length?`<div class="sh-sec">مراجعات قوقل المرصودة</div>`+revs.map(r=>`
       <div class="rev ${r.rating<=2?"bad":r.rating>=4?"good":""}">«${esc(r.excerpt)}»
@@ -683,6 +735,43 @@ async function approveSuggested(id){
   try{await api(`crm_accounts?id=eq.${id}`,{method:"PATCH",body:JSON.stringify({status:"lead"})});
     a.status="lead"; closeSheet(); toast("اعتُمد الحساب ✅ وبقي مسنداً لمقترحه"); renderAccounts();
   }catch(e){toast("تعذر الاعتماد: "+e.message)}}
+const ORIGINS=["إثيوبي","كولومبي","يمني","برازيلي","كيني","بنمي/نادر"];
+const DRINKS=["إسبريسو غالب","متوازن","فلتر غالب","كولد غالب"];
+const MOVERS=["قهوة اليوم","بلند إسبريسو","كولد برو","V60/مقطرة","مختص نادر"];
+const DECIDERS=["المالك","مدير التشغيل","الباريستا الأول"];
+function chipGrp(id,opts,val,multi){
+  const sel=multi?(val||[]):[val];
+  return `<div class="pf-chips" data-grp="${id}" data-multi="${multi?1:0}">`
+    +opts.map(o=>`<button type="button" class="chip ${sel.includes(o)?"on":""}" onclick="pfTap(this)">${o}</button>`).join("")+`</div>`;}
+function pfTap(btn){
+  const g=btn.parentElement, multi=g.dataset.multi==="1";
+  if(multi){btn.classList.toggle("on")}
+  else{const was=btn.classList.contains("on");
+    g.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
+    if(!was)btn.classList.add("on")}}
+function pfRead(id,multi){
+  const g=document.querySelector(`[data-grp="${id}"]`); if(!g)return multi?[]:null;
+  const on=[...g.querySelectorAll(".chip.on")].map(c=>c.textContent);
+  return multi?on:(on[0]||null);}
+function pfForm(a){
+  return `<details class="pf"><summary>بروفايل المقهى — لمسات سريعة (اختياري)</summary>
+    <div class="pf-lbl">وش الغالب على مبيعهم؟</div>${chipGrp("pfDrink",DRINKS,a.drink_profile)}
+    <div class="pf-lbl">الأصول اللي تنسحب عندهم (تقدر تختار أكثر من واحد)</div>${chipGrp("pfOrig",ORIGINS,a.origins,true)}
+    <div class="pf-lbl">أسرع صنف ينفد</div>${chipGrp("pfMover",MOVERS,a.fast_mover)}
+    <div class="pf-lbl">مهتمون بالنادر/الميكرولوت؟</div>${chipGrp("pfRare",["نعم — يشترون النادر"],a.rare_buyer?"نعم — يشترون النادر":null)}
+    <div class="pf-lbl">منو صاحب قرار الشراء؟</div>${chipGrp("pfDec",DECIDERS,a.decision_maker)}
+    <div class="pf-lbl">عقد موردهم ينتهي في؟ (أثمن تاريخ تجيبه)</div>
+    <input class="inp" id="pfContract" type="date" value="${a.contract_end||""}" style="max-width:200px">
+  </details>`;}
+function pfCollect(a){
+  const out={};
+  const dp=pfRead("pfDrink"); if(dp!==a.drink_profile&&(dp||a.drink_profile))out.drink_profile=dp;
+  const og=pfRead("pfOrig",true); if(JSON.stringify(og)!==JSON.stringify(a.origins||[])&&(og.length||a.origins?.length))out.origins=og;
+  const fm=pfRead("pfMover"); if(fm!==a.fast_mover&&(fm||a.fast_mover))out.fast_mover=fm;
+  const rb=!!pfRead("pfRare"); if(rb!==!!a.rare_buyer)out.rare_buyer=rb;
+  const dm=pfRead("pfDec"); if(dm!==a.decision_maker&&(dm||a.decision_maker))out.decision_maker=dm;
+  const ce=$("pfContract")?.value||null; if(ce!==(a.contract_end||null))out.contract_end=ce;
+  return out;}
 function quickLog(id){
   const a=accById(id);
   const opts=[["مهتم — أرسل عينة","إرسال عينة وتحديد موعد تذوق",2],
@@ -698,6 +787,7 @@ function quickLog(id){
       <input class="inp" id="inPrice" type="number" inputmode="decimal" placeholder="سعر الكيلو (ريال)" value="${a.supplier_price_per_kg||""}">
       <input class="inp" id="inKg" type="number" inputmode="numeric" placeholder="الاستهلاك (كغ/شهر)" value="${a.monthly_kg_estimate||""}">
     </div>
+    ${pfForm(a)}
     <div class="frm" style="margin-top:0"><textarea class="ta" id="logNote" rows="2" placeholder="ملاحظة (اختياري) — اكتبها أولاً ثم اختر النتيجة…"></textarea>
     ${opts.map((o,i)=>`<button class="btn ${i===0?"b-call":"b-ghost"}" style="justify-content:center" onclick="logResult(${id},${i})">${o[0]}</button>`).join("")}</div>`);
   window._opts=opts;
@@ -714,6 +804,10 @@ async function logResult(id,i){
   if(sup && sup!==a.current_supplier) intel.current_supplier=sup;
   if(pr && pr!==+a.supplier_price_per_kg) intel.supplier_price_per_kg=pr;
   if(kg && kg!==+a.monthly_kg_estimate) intel.monthly_kg_estimate=kg;
+  const pf=pfCollect(a);
+  if(Object.keys(pf).length){
+    try{await api(`crm_accounts?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(pf)});
+      Object.assign(a,pf);}catch(e){}}
   let intelTxt="";
   if(sup||pr||kg){
     intelTxt=" 🎯 "+[sup?`المورد: ${sup}`:"",pr?`${pr} ر/كغ`:"",kg?`${kg} كغ/شهر`:""].filter(Boolean).join(" · ");
