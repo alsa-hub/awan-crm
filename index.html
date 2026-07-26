@@ -734,8 +734,9 @@ async function saveSuggested(){
     intel_updated_at:($("sgSupplier").value.trim()||$("sgPrice").value)?new Date().toISOString():null,
     status:admin?"lead":"suggested",assigned_to:admin?null:ME.id};
   try{const r=await api("crm_accounts",{method:"POST",body:JSON.stringify(row)});
-    ACC.unshift(r?.[0]||row); closeSheet();
-    toast(admin?"أُضيف الحساب ✅":"أُرسل اقتراحك للمدير ⏳"); renderAccounts();
+    const acc=r?.[0]||row; ACC.unshift(acc);
+    toast(admin?"أُضيف الحساب ✅ — كمّل بياناته":"أُرسل للاعتماد ⏳ — كمّل بياناته"); renderAccounts();
+    if(acc.id) openAcc(acc.id); else closeSheet();
   }catch(e){toast("تعذر الحفظ: "+e.message)}}
 async function approveSuggested(id){
   const a=accById(id);
