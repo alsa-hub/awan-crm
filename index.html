@@ -233,7 +233,7 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
   <div class="card" id="teamCard" style="display:none"><h3>أداء الفريق — آخر ٧ أيام</h3><div id="teamPerf"></div></div>
   <div class="card" id="pounceCard" style="display:none"><h3>🎯 نافذة الانقضاض — عقود منافسين تنتهي</h3><div id="pounceList"></div></div>
   <div class="card" id="tasteCard" style="display:none"><h3>☕ وش يشرب السوق</h3><div id="tasteMap"></div></div>
-  <div class="card" id="intelCard"><h3>خريطة أسعار السوق 🎯</h3><div id="intelMap"></div></div>
+  <div class="card" id="intelCard"><h3>دراسة أسعار السوق 🎯</h3><div id="intelMap"></div></div>
   <div class="card"><h3>آخر النشاط</h3><div class="feed" id="actFeed"></div></div>
   <div class="card"><h3>خط الصفقات (كغ/شهر)</h3><div class="bars" id="chPipe"></div></div>
   <div class="card"><h3>الحسابات حسب الأولوية</h3><div class="bars" id="chPrio"></div></div>
@@ -550,7 +550,7 @@ function renderIntel(){
   const withPrice=ACC.filter(a=>a.supplier_price_per_kg>0);
   const withSup=ACC.filter(a=>a.current_supplier);
   if(!withPrice.length&&!withSup.length){
-    $("intelMap").innerHTML=`<div class="mini">لا استخبارات بعد — كل زيارة تسجّل فيها المورد والسعر تبني هذه الخريطة، حتى الزيارات الفاشلة</div>`;return}
+    $("intelMap").innerHTML=`<div class="mini">لا بيانات بعد — كل زيارة تسجّل فيها المورد والسعر تبني هذه الدراسة، حتى الزيارات الفاشلة</div>`;return}
   const prices=withPrice.map(a=>+a.supplier_price_per_kg).sort((x,y)=>x-y);
   const avg=prices.reduce((s,p)=>s+p,0)/prices.length;
   const med=prices[Math.floor(prices.length/2)];
@@ -668,7 +668,7 @@ function openAcc(id){
         <option value="">— غير مسنّد —</option>
         ${USERS.filter(u=>u.status==="approved").map(u=>`<option value="${u.id}" ${a.assigned_to===u.id?"selected":""}>${esc(u.full_name||u.email)} ${u.role==="admin"?"(مدير)":""}</option>`).join("")}
       </select>`:""}
-    ${(a.current_supplier||a.supplier_price_per_kg||a.monthly_kg_estimate)?`<div class="sh-sec">استخبارات السوق 🎯</div>
+    ${(a.current_supplier||a.supplier_price_per_kg||a.monthly_kg_estimate)?`<div class="sh-sec">تحليل السوق 🎯</div>
       <div class="rev" style="border-inline-start-color:var(--amber)">
         ${a.current_supplier?`المورد الحالي: <b>${esc(a.current_supplier)}</b>`:""}
         ${a.supplier_price_per_kg?` · السعر: <b class="num">${a.supplier_price_per_kg}</b> ر/كغ`:""}
@@ -830,7 +830,7 @@ function quickLog(id){
               ["غير مهتم حالياً","إعادة المحاولة بعد شهر",30]];
   openSheet(`<div class="sh-name">نتيجة التواصل — ${esc(a.name_ar)}</div>
     <div class="sh-meta">اختر النتيجة وستُسجَّل مع متابعة تلقائية</div>
-    <div class="sh-sec">استخبارات الزيارة — الكنز حتى لو ما بعت 🎯</div>
+    <div class="sh-sec">بيانات السوق — الكنز حتى لو ما بعت 🎯</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
       <input class="inp" id="inSupplier" placeholder="المورد الحالي؟" value="${esc(a.current_supplier||"")}" style="grid-column:1/-1">
       <input class="inp" id="inPrice" type="number" inputmode="decimal" placeholder="سعر الكيلو (ريال)" value="${a.supplier_price_per_kg||""}">
