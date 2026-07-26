@@ -222,6 +222,7 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
   <div class="sub" id="dashDate"></div>
   <div class="kpis" id="kpis"></div>
   <div class="card" id="teamCard" style="display:none"><h3>أداء الفريق — آخر ٧ أيام</h3><div id="teamPerf"></div></div>
+  <div class="card" id="intelCard"><h3>خريطة أسعار السوق 🎯</h3><div id="intelMap"></div></div>
   <div class="card"><h3>آخر النشاط</h3><div class="feed" id="actFeed"></div></div>
   <div class="card"><h3>خط الصفقات (كغ/شهر)</h3><div class="bars" id="chPipe"></div></div>
   <div class="card"><h3>الحسابات حسب الأولوية</h3><div class="bars" id="chPrio"></div></div>
@@ -463,7 +464,7 @@ function renderDash(){
   const prm=Math.max(...pr.map(x=>x.v),1);
   const pc={"قصوى":"var(--p1)","مرتفعة":"var(--p2)","متوسطة":"var(--p3)","منخفضة":"var(--p4)"};
   $("chPrio").innerHTML=pr.map(x=>bar(x.p,x.v,prm,pc[x.p])).join("");
-  renderTeam(); renderFeed();
+  renderTeam(); renderFeed(); renderIntel();
   const dm={}; ACC.filter(isOpenAcc).forEach(a=>{if(a.district)dm[a.district]=(dm[a.district]||0)+1});
   const ds=Object.entries(dm).sort((a,b)=>b[1]-a[1]).slice(0,7);
   const dmx=Math.max(...ds.map(x=>x[1]),1);
@@ -496,6 +497,35 @@ function renderTeam(){
       <span class="cell"><span class="pill a num">${Math.round(r.openKg)}</span></span>
       <span class="cell"><span class="pill ${r.late?"r":"n"} num">${r.late}</span></span>
     </div>`).join("")||`<div class="mini">لا أعضاء معتمدون بعد</div>`;
+}
+function renderIntel(){
+  const withPrice=ACC.filter(a=>a.supplier_price_per_kg>0);
+  const withSup=ACC.filter(a=>a.current_supplier);
+  if(!withPrice.length&&!withSup.length){
+    $("intelMap").innerHTML=`<div class="mini">لا استخبارات بعد — كل زيارة تسجّل فيها المورد والسعر تبني هذه الخريطة، حتى الزيارات الفاشلة</div>`;return}
+  const prices=withPrice.map(a=>+a.supplier_price_per_kg).sort((x,y)=>x-y);
+  const avg=prices.reduce((s,p)=>s+p,0)/prices.length;
+  const med=prices[Math.floor(prices.length/2)];
+  let html=`<div class="kpis" style="margin-bottom:10px">
+    <div class="kpi"><div class="v num">${withSup.length}</div><div class="l">حساب معلوم المورد</div></div>
+    <div class="kpi"><div class="v num">${prices.length?Math.round(avg):"—"}</div><div class="l">متوسط سعر الكيلو (وسيط <span class="num">${med||"—"}</span>)</div></div>
+    <div class="kpi"><div class="v num">${prices[0]??"—"}</div><div class="l">أدنى سعر مرصود</div></div>
+    <div class="kpi"><div class="v num">${prices[prices.length-1]??"—"}</div><div class="l">أعلى سعر مرصود</div></div>
+  </div>`;
+  // المنافسون
+  const sup={};
+  withSup.forEach(a=>{const k=a.current_supplier.trim();
+    (sup[k]=sup[k]||{n:0,ps:[],kg:0}); sup[k].n++;
+    if(a.supplier_price_per_kg>0)sup[k].ps.push(+a.supplier_price_per_kg);
+    if(a.monthly_kg_estimate>0)sup[k].kg+=+a.monthly_kg_estimate;});
+  const tops=Object.entries(sup).sort((x,y)=>y[1].n-x[1].n).slice(0,8);
+  const mx=Math.max(...tops.map(([,v])=>v.n),1);
+  html+=`<div class="bars">`+tops.map(([k,v])=>{
+    const pavg=v.ps.length?Math.round(v.ps.reduce((s,p)=>s+p,0)/v.ps.length):null;
+    return bar(`${k}${pavg?` (~${pavg} ر)`:""}`,v.n,mx);}).join("")+`</div>`;
+  const totKg=ACC.reduce((s,a)=>s+(+a.monthly_kg_estimate||0),0);
+  if(totKg)html+=`<div class="legend"><span>إجمالي الاستهلاك المرصود في السوق: <b class="num">${Math.round(totKg).toLocaleString("en")}</b> كغ/شهر</span></div>`;
+  $("intelMap").innerHTML=html;
 }
 function renderFeed(){
   const list=[...ACTS].filter(x=>x.created_at)
@@ -556,6 +586,13 @@ function openAcc(id){
         <option value="">— غير مسنّد —</option>
         ${USERS.filter(u=>u.status==="approved").map(u=>`<option value="${u.id}" ${a.assigned_to===u.id?"selected":""}>${esc(u.full_name||u.email)} ${u.role==="admin"?"(مدير)":""}</option>`).join("")}
       </select>`:""}
+    ${(a.current_supplier||a.supplier_price_per_kg||a.monthly_kg_estimate)?`<div class="sh-sec">استخبارات السوق 🎯</div>
+      <div class="rev" style="border-inline-start-color:var(--amber)">
+        ${a.current_supplier?`المورد الحالي: <b>${esc(a.current_supplier)}</b>`:""}
+        ${a.supplier_price_per_kg?` · السعر: <b class="num">${a.supplier_price_per_kg}</b> ر/كغ`:""}
+        ${a.monthly_kg_estimate?` · الاستهلاك: <b class="num">${a.monthly_kg_estimate}</b> كغ/شهر`:""}
+        ${a.intel_updated_at?`<div class="rr">آخر تحديث: ${timeAgo(a.intel_updated_at)}</div>`:""}
+      </div>`:""}
     ${a.notes?`<div class="sh-sec">الزاوية البيعية</div><div class="q p-${a.priority||""}" style="margin:0"><div class="angle" style="margin:0">${esc(a.notes)}</div></div>`:""}
     ${revs.length?`<div class="sh-sec">مراجعات قوقل المرصودة</div>`+revs.map(r=>`
       <div class="rev ${r.rating<=2?"bad":r.rating>=4?"good":""}">«${esc(r.excerpt)}»
@@ -581,15 +618,38 @@ function quickLog(id){
               ["غير مهتم حالياً","إعادة المحاولة بعد شهر",30]];
   openSheet(`<div class="sh-name">نتيجة التواصل — ${esc(a.name_ar)}</div>
     <div class="sh-meta">اختر النتيجة وستُسجَّل مع متابعة تلقائية</div>
-    <div class="frm"><textarea class="ta" id="logNote" rows="2" placeholder="ملاحظة (اختياري) — اكتبها أولاً ثم اختر النتيجة…"></textarea>
+    <div class="sh-sec">استخبارات الزيارة — الكنز حتى لو ما بعت 🎯</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
+      <input class="inp" id="inSupplier" placeholder="المورد الحالي؟" value="${esc(a.current_supplier||"")}" style="grid-column:1/-1">
+      <input class="inp" id="inPrice" type="number" inputmode="decimal" placeholder="سعر الكيلو (ريال)" value="${a.supplier_price_per_kg||""}">
+      <input class="inp" id="inKg" type="number" inputmode="numeric" placeholder="الاستهلاك (كغ/شهر)" value="${a.monthly_kg_estimate||""}">
+    </div>
+    <div class="frm" style="margin-top:0"><textarea class="ta" id="logNote" rows="2" placeholder="ملاحظة (اختياري) — اكتبها أولاً ثم اختر النتيجة…"></textarea>
     ${opts.map((o,i)=>`<button class="btn ${i===0?"b-call":"b-ghost"}" style="justify-content:center" onclick="logResult(${id},${i})">${o[0]}</button>`).join("")}</div>`);
   window._opts=opts;
 }
 async function logResult(id,i){
   const [label,next,days]=window._opts[i];
   const note=($("logNote")?.value||"").trim();
+  const a=accById(id);
+  // التقاط الاستخبارات
+  const sup=($("inSupplier")?.value||"").trim();
+  const pr=parseFloat($("inPrice")?.value)||null;
+  const kg=parseFloat($("inKg")?.value)||null;
+  const intel={};
+  if(sup && sup!==a.current_supplier) intel.current_supplier=sup;
+  if(pr && pr!==+a.supplier_price_per_kg) intel.supplier_price_per_kg=pr;
+  if(kg && kg!==+a.monthly_kg_estimate) intel.monthly_kg_estimate=kg;
+  let intelTxt="";
+  if(sup||pr||kg){
+    intelTxt=" 🎯 "+[sup?`المورد: ${sup}`:"",pr?`${pr} ر/كغ`:"",kg?`${kg} كغ/شهر`:""].filter(Boolean).join(" · ");
+    if(Object.keys(intel).length){
+      intel.intel_updated_at=new Date().toISOString();
+      try{await api(`crm_accounts?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(intel)});
+        Object.assign(a,intel);}catch(e){}
+    }}
   const d=new Date(); d.setDate(d.getDate()+days);
-  const row={account_id:id,activity_type:"call",notes:label+(note?" — "+note:""),next_action:next,next_action_date:d.toISOString().slice(0,10)};
+  const row={account_id:id,activity_type:"call",notes:label+(note?" — "+note:"")+intelTxt,next_action:next,next_action_date:d.toISOString().slice(0,10)};
   try{
     if(DEMO){ACTS.unshift({id:Date.now(),...row})}
     else{await api("crm_activities",{method:"POST",body:JSON.stringify(row)})
@@ -610,7 +670,7 @@ async function assignAccount(accId,uid){
     if(document.getElementById("scr-acc").classList.contains("on"))renderAccounts();
   }catch(e){a.assigned_to=old; toast("تعذر الإسناد: "+e.message)}}
 async function newDeal(id){
-  const kg=prompt("الكمية الشهرية المتوقعة بالكيلو؟","60"); if(kg===null)return;
+  const kg=prompt("الكمية الشهرية المتوقعة بالكيلو؟",accById(id).monthly_kg_estimate||"60"); if(kg===null)return;
   const row={account_id:id,stage:"new",expected_monthly_kg:+kg||0,probability:20};
   try{
     if(DEMO){DEALS.unshift({id:Date.now(),...row})}
