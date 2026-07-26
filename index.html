@@ -233,7 +233,10 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
 <section class="screen" id="scr-acc">
   <h2 class="scr">الحسابات</h2>
   <div class="sub" id="accCount"></div>
-  <input class="search" id="accSearch" placeholder="ابحث بالاسم أو الحي أو الهاتف…" oninput="renderAccounts()">
+  <div style="display:flex;gap:8px">
+    <input class="search" id="accSearch" placeholder="ابحث بالاسم أو الحي أو الهاتف…" oninput="renderAccounts()" style="flex:1">
+    <button class="btn b-amber" onclick="suggestAccount()" style="white-space:nowrap">＋ حساب</button>
+  </div>
   <div style="height:9px"></div>
   <div class="chips" id="accChips"></div>
   <div id="accList"></div>
@@ -255,7 +258,7 @@ a.lnk{color:var(--roast); font-weight:600; text-decoration:none}
 <!-- ======== الإدارة ======== -->
 <section class="screen" id="scr-admin">
   <h2 class="scr">إدارة الفريق</h2>
-  <div class="sub">اعتمد المندوبين الجدد وأدر الأدوار — الاعتماد يؤكد إيميلهم تلقائياً</div>
+  <div class="sub" id="adminSub">اعتمد المندوبين الجدد وأدر الأدوار — الاعتماد يؤكد إيميلهم تلقائياً</div>
   <div id="adminList"></div>
 </section>
 </main>
@@ -304,7 +307,7 @@ const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},
 
 /* ================= حالة ================= */
 let ACC=[], DEALS=[], ACTS=[], REVS=[], USERS=[];
-let accFilter="الكل", todayFilter="الكل";
+let accFilter="الكل", todayFilter="الكل", todayView="prio";
 
 /* ================= REST ================= */
 async function api(path, opts={}, retried){
@@ -415,12 +418,16 @@ function go(s,btn){document.querySelectorAll(".screen").forEach(e=>e.classList.r
 /* ================= اليوم ================= */
 function renderToday(){
   const chips=["الكل",...PRIOS];
-  $("todayChips").innerHTML=chips.map(c=>`<button class="chip ${todayFilter===c?"on":""}" onclick="todayFilter='${c}';renderToday()">${c}</button>`).join("");
+  $("todayChips").innerHTML=chips.map(c=>`<button class="chip ${todayFilter===c?"on":""}" onclick="todayFilter='${c}';renderToday()">${c}</button>`).join("")
+   +`<span style="border-inline-start:1px solid var(--line);margin:0 3px"></span>`
+   +`<button class="chip ${todayView==="prio"?"on":""}" onclick="todayView='prio';renderToday()">بالأولوية</button>`
+   +`<button class="chip ${todayView==="tour"?"on":""}" onclick="todayView='tour';renderToday()">🗺 جولة الأحياء</button>`;
   const leads=ACC.filter(a=>isOpenAcc(a)&&(a.status==="lead"||a.status==="contacted"||!a.status))
     .filter(a=>todayFilter==="الكل"||a.priority===todayFilter)
     .sort((a,b)=>(PRIOS.indexOf(a.priority??9)-PRIOS.indexOf(b.priority??9))||((b.reviews_count||0)-(a.reviews_count||0)))
     .slice(0,30);
-  $("todaySub").textContent=`${leads.length} حساب جاهز للتواصل${ME?.role==="rep"?" — حساباتك المسندة لك":""} — مرتب حسب الأولوية`;
+  $("todaySub").textContent=`${leads.length} حساب جاهز للتواصل${ME?.role==="rep"?" — حساباتك":""}${todayView==="tour"?" — مجمّع بالأحياء لجولة ٤–٦ مساءً":" — مرتب حسب الأولوية"}`;
+  if(todayView==="tour"){renderTour(leads);return}
   $("queue").innerHTML=leads.length?leads.map(a=>{
     const angle=a.notes?`<div class="angle"><b>الزاوية:</b> ${esc(a.notes)}</div>`:"";
     const dl=DEALS.find(d=>d.account_id==a.id&&!["won","lost","frozen"].includes(d.stage));
@@ -440,6 +447,34 @@ function renderToday(){
   }).join(""):`<div class="empty"><div class="big">☕</div>ما فيه حسابات مطابقة — وسّع الفلتر أو أضف حسابات جديدة</div>`;
 }
 
+function tourLink(list){
+  const pts=list.filter(a=>a.lat&&a.lng).slice(0,9);
+  if(pts.length<1)return"";
+  const dest=pts[pts.length-1], way=pts.slice(0,-1);
+  const u=`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}${way.length?`&waypoints=${way.map(p=>p.lat+","+p.lng).join("|")}`:""}&travelmode=driving`;
+  return `<a class="btn b-wa b-sm" target="_blank" href="${u}">🧭 افتح المسار (${pts.length})</a>`;}
+function renderTour(leads){
+  const g={}; leads.forEach(a=>{const d=a.district||"بدون حي"; (g[d]=g[d]||[]).push(a)});
+  const score=arr=>arr.filter(a=>a.priority==="قصوى").length*10+arr.filter(a=>a.priority==="مرتفعة").length*3+arr.length*.1;
+  const dists=Object.entries(g).sort((x,y)=>score(y[1])-score(x[1]));
+  $("queue").innerHTML=dists.map(([d,arr])=>`
+    <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;margin:14px 0 6px">
+      <b style="font-size:14.5px">📍 ${esc(d)}</b><span class="mini">${arr.length} حساب</span>
+      <span style="flex:1"></span>${tourLink(arr)}
+    </div>`+arr.map(a=>`
+    <div class="q p-${a.priority||""}" style="margin-bottom:9px">
+      <div class="top"><div style="flex:1;min-width:0">
+        <div class="name">${esc(a.name_ar)}</div>
+        <div class="meta"><span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span>${a.current_supplier?` · 🎯 ${esc(a.current_supplier)}`:""}</div>
+      </div>${beans(a.priority)}</div>
+      <div class="acts">
+        <a class="btn b-call b-sm" href="tel:${digits(a.phone)}">اتصال</a>
+        ${a.google_maps_url?`<a class="btn b-ghost b-sm" target="_blank" href="${esc(a.google_maps_url)}">📍 الموقع</a>`:""}
+        <button class="btn b-amber b-sm" onclick="quickLog(${a.id})">سجّل</button>
+        <button class="btn b-ghost b-sm" onclick="openAcc(${a.id})">البطاقة</button>
+      </div></div>`).join("")).join("")
+    ||`<div class="empty"><div class="big">🗺</div>لا حسابات للجولة</div>`;
+}
 /* ================= اللوحة ================= */
 function bar(label,val,max,color){const w=max?Math.max(3,val/max*100):0;
   return `<div class="bar"><span>${esc(label)}</span><span class="tr"><span class="fl" style="width:${w}%;${color?`background:${color}`:""}"></span></span><span class="vv num">${val}</span></div>`}
@@ -455,7 +490,8 @@ function renderDash(){
     <div class="kpi"><div class="v num">${ACC.filter(isOpenAcc).length}</div><div class="l">حساب مفتوح</div></div>
     <div class="kpi"><div class="v num">${open.length}</div><div class="l">صفقة نشطة</div></div>
     <div class="kpi"><div class="v num">${Math.round(kg).toLocaleString("en")} <span style="font-size:13px">كغ</span></div><div class="l">حجم الخط الشهري · موزون <span class="num">${Math.round(wkg)}</span> كغ</div></div>
-    <div class="kpi ${late?"warn":""}"><div class="v num">${late}</div><div class="l">متابعة متأخرة</div></div>`;
+    <div class="kpi ${late?"warn":""}"><div class="v num">${late}</div><div class="l">متابعة متأخرة</div></div>
+    ${(()=>{const sc=silentCustomers().length;return sc?`<div class="kpi warn"><div class="v num">${sc}</div><div class="l">🔕 عميل صامت +١٤ يوماً</div></div>`:""})()}`;
   const pipe=STAGES.filter(s=>!["lost","frozen"].includes(s)).map(s=>({s,v:DEALS.filter(d=>d.stage===s).reduce((x,d)=>x+(+d.expected_monthly_kg||0),0)}));
   const pm=Math.max(...pipe.map(p=>p.v),1);
   $("chPipe").innerHTML=pipe.map(p=>bar(STAGE_AR[p.s],Math.round(p.v),pm,p.s==="won"?"var(--green)":null)).join("")
@@ -540,12 +576,13 @@ function renderFeed(){
 }
 /* ================= الحسابات ================= */
 function renderAccounts(){
-  const chips=["الكل",...PRIOS,"عملاء","مستبعد",...(ME?.role==="admin"?["غير مسنّد"]:[])];
+  const chips=["الكل",...PRIOS,"عملاء","مستبعد",...(ME?.role==="admin"?["غير مسنّد","مقترحة"]:[])];
   $("accChips").innerHTML=chips.map(c=>`<button class="chip ${accFilter===c?"on":""}" onclick="accFilter='${c}';renderAccounts()">${c}</button>`).join("");
   const q=($("accSearch").value||"").trim();
   let list=ACC.filter(a=>{
     if(accFilter==="مستبعد")return !!a.exclusion_reason||a.status==="excluded";
     if(accFilter==="غير مسنّد")return isOpenAcc(a)&&!a.assigned_to;
+    if(accFilter==="مقترحة")return a.status==="suggested";
     if(!isOpenAcc(a))return false;
     if(accFilter==="عملاء")return a.status==="customer"||DEALS.some(d=>d.account_id==a.id&&d.stage==="won");
     if(PRIOS.includes(accFilter))return a.priority===accFilter;
@@ -555,7 +592,7 @@ function renderAccounts(){
   $("accCount").textContent=`${list.length} حساب`;
   $("accList").innerHTML=list.slice(0,200).map(a=>{
     const cust=a.status==="customer"||DEALS.some(d=>d.account_id==a.id&&d.stage==="won");
-    const tag=a.exclusion_reason?`<span class="tag t-x">مستبعد</span>`:cust?`<span class="tag t-cust">عميل</span>`:`<span class="tag t-lead">${a.status==="contacted"?"تم التواصل":"فرصة"}</span>`;
+    const tag=a.exclusion_reason?`<span class="tag t-x">مستبعد</span>`:a.status==="suggested"?`<span class="tag t-lead" style="background:var(--red-soft);color:var(--red)">مقترح ⏳</span>`:cust?`<span class="tag t-cust">عميل</span>`:`<span class="tag t-lead">${a.status==="contacted"?"تم التواصل":"فرصة"}</span>`;
     return `<div class="row" onclick="openAcc(${a.id})">
       <div class="grow"><div class="nm">${esc(a.name_ar)}</div>
       <div class="mt">${esc(a.district||"")} · <span class="num">${a.reviews_count||0}</span> مراجعة · <span class="star">★ ${a.rating??"-"}</span>${ME?.role==="admin"?` · ${a.assigned_to?"👤 "+esc(userName(a.assigned_to)||"?"):"<span style=\'color:var(--amber)\'>غير مسنّد</span>"}`:""}</div></div>
@@ -604,11 +641,41 @@ function openAcc(id){
     <div class="sh-sec">إجراء</div>
     <div class="acts">
       <button class="btn b-amber b-sm" onclick="quickLog(${a.id})">سجّل مكالمة</button>
+      ${isCustomer(a)?`<button class="btn b-wa b-sm" onclick="logOrder(${a.id})">📦 سجّل توريدة</button>`:""}
+      ${ME?.role==="admin"&&a.status==="suggested"?`<button class="btn b-call b-sm" onclick="approveSuggested(${a.id})">اعتماد الحساب ✓</button>`:""}
       ${deals.length?"":`<button class="btn b-ghost b-sm" onclick="newDeal(${a.id})">افتح صفقة</button>`}
     </div>`);
 }
 
 /* ================= تسجيل سريع ================= */
+function suggestAccount(){
+  const admin=ME?.role==="admin";
+  openSheet(`<div class="sh-name">${admin?"إضافة حساب جديد":"اقتراح حساب من الميدان"}</div>
+    <div class="sh-meta">${admin?"يُضاف مباشرة كفرصة":"يُرسل للمدير للاعتماد، ويبقى مسنداً لك"}</div>
+    <div class="frm">
+      <input class="inp" id="sgName" placeholder="اسم المقهى *">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input class="inp" id="sgDist" placeholder="الحي">
+        <input class="inp" id="sgPhone" dir="ltr" inputmode="tel" placeholder="الهاتف">
+      </div>
+      <textarea class="ta" id="sgNotes" rows="2" placeholder="ملاحظات — وش شفت؟ منو موردهم؟"></textarea>
+      <button class="btn b-call" style="justify-content:center" onclick="saveSuggested()">${admin?"إضافة الحساب":"إرسال الاقتراح"}</button>
+    </div>`);}
+async function saveSuggested(){
+  const name=$("sgName").value.trim(); if(!name){toast("اكتب اسم المقهى");return}
+  const admin=ME?.role==="admin";
+  const row={name_ar:name,district:$("sgDist").value.trim()||null,phone:$("sgPhone").value.trim()||null,
+    notes:$("sgNotes").value.trim()||null,priority:"متوسطة",
+    status:admin?"lead":"suggested",assigned_to:admin?null:ME.id};
+  try{const r=await api("crm_accounts",{method:"POST",body:JSON.stringify(row)});
+    ACC.unshift(r?.[0]||row); closeSheet();
+    toast(admin?"أُضيف الحساب ✅":"أُرسل اقتراحك للمدير ⏳"); renderAccounts();
+  }catch(e){toast("تعذر الحفظ: "+e.message)}}
+async function approveSuggested(id){
+  const a=accById(id);
+  try{await api(`crm_accounts?id=eq.${id}`,{method:"PATCH",body:JSON.stringify({status:"lead"})});
+    a.status="lead"; closeSheet(); toast("اعتُمد الحساب ✅ وبقي مسنداً لمقترحه"); renderAccounts();
+  }catch(e){toast("تعذر الاعتماد: "+e.message)}}
 function quickLog(id){
   const a=accById(id);
   const opts=[["مهتم — أرسل عينة","إرسال عينة وتحديد موعد تذوق",2],
@@ -692,15 +759,41 @@ function renderDeals(){
         const i=STAGES.indexOf(s);
         const prev=i>0&&!["won","lost","frozen"].includes(s)?STAGES[i-1]:null;
         const nxt=i<3?STAGES[i+1]:(s==="negotiation"?"won":null);
-        return `<div class="deal"><div class="dn">${esc(a.name_ar||"؟")}</div>
-          <div class="dk"><span class="num">${d.expected_monthly_kg||0}</span> كغ/شهر · احتمال <span class="num">${d.probability||0}%</span></div>
+        const stale=!["won","lost","frozen"].includes(s)&&d.updated_at&&(Date.now()-new Date(d.updated_at))>30*864e5;
+        const val=d.agreed_price_per_kg&&d.expected_monthly_kg?Math.round(d.agreed_price_per_kg*d.expected_monthly_kg):null;
+        return `<div class="deal" onclick="editDeal(${d.id})" style="cursor:pointer">
+          <div class="dn">${esc(a.name_ar||"؟")} ${stale?`<span class="pill r" style="font-size:9.5px">راكدة +٣٠ يوم</span>`:""}</div>
+          <div class="dk"><span class="num">${d.expected_monthly_kg||0}</span> كغ/شهر · احتمال <span class="num">${d.probability||0}%</span>
+            ${d.agreed_price_per_kg?`<br>سعر <span class="num">${d.agreed_price_per_kg}</span> ر/كغ${val?` = <b class="num">${val.toLocaleString("en")}</b> ر/شهر`:""}`:""}
+            ${d.expected_close_date?`<br>إغلاق متوقع: ${fmtD(d.expected_close_date)}`:""}</div>
           <div class="mv">
-            ${prev?`<button class="mvb" onclick="moveDeal(${d.id},'${prev}')">→ ${STAGE_AR[prev]}</button>`:""}
-            ${nxt?`<button class="mvb" style="color:var(--green)" onclick="moveDeal(${d.id},'${nxt}')">${STAGE_AR[nxt]} ←</button>`:""}
-            ${s==="negotiation"?`<button class="mvb" style="color:var(--red)" onclick="moveDeal(${d.id},'lost')">خسارة</button>`:""}
+            ${prev?`<button class="mvb" onclick="event.stopPropagation();moveDeal(${d.id},'${prev}')">→ ${STAGE_AR[prev]}</button>`:""}
+            ${nxt?`<button class="mvb" style="color:var(--green)" onclick="event.stopPropagation();moveDeal(${d.id},'${nxt}')">${STAGE_AR[nxt]} ←</button>`:""}
+            ${s==="negotiation"?`<button class="mvb" style="color:var(--red)" onclick="event.stopPropagation();moveDeal(${d.id},'lost')">خسارة</button>`:""}
           </div></div>`}).join("")||`<div class="mini" style="text-align:center;padding:14px 0">فارغة</div>`}
     </div>`}).join("");
 }
+function editDeal(id){
+  const d=DEALS.find(x=>x.id==id); if(!d)return; const a=accById(d.account_id);
+  openSheet(`<div class="sh-name">صفقة ${esc(a.name_ar||"")}</div>
+    <div class="sh-meta">${STAGE_AR[d.stage]||d.stage} · آخر تحديث ${timeAgo(d.updated_at)||"—"}</div>
+    <div class="frm">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input class="inp" id="dKg" type="number" inputmode="numeric" placeholder="كغ/شهر" value="${d.expected_monthly_kg||""}">
+        <input class="inp" id="dPrice" type="number" inputmode="decimal" placeholder="السعر المتفق (ر/كغ)" value="${d.agreed_price_per_kg||""}">
+        <input class="inp" id="dProb" type="number" min="0" max="100" placeholder="الاحتمال %" value="${d.probability||""}">
+        <input class="inp" id="dClose" type="date" value="${d.expected_close_date||""}">
+      </div>
+      <button class="btn b-call" style="justify-content:center" onclick="saveDeal(${d.id})">حفظ الأرقام</button>
+    </div>`);}
+async function saveDeal(id){
+  const d=DEALS.find(x=>x.id==id); if(!d)return;
+  const body={expected_monthly_kg:+$("dKg").value||null,agreed_price_per_kg:+$("dPrice").value||null,
+    probability:+$("dProb").value||null,expected_close_date:$("dClose").value||null};
+  try{await api(`crm_deals?id=eq.${id}`,{method:"PATCH",body:JSON.stringify(body)});
+    Object.assign(d,body,{updated_at:new Date().toISOString()});
+    closeSheet(); toast("حُفظت أرقام الصفقة 💾"); renderDeals();
+  }catch(e){toast("تعذر الحفظ: "+e.message)}}
 async function moveDeal(id,stage){
   const d=DEALS.find(x=>x.id==id); if(!d)return;
   const old=d.stage; d.stage=stage; renderDeals();
@@ -716,11 +809,33 @@ function renderTasks(){
     .sort((a,b)=>new Date(a.next_action_date)-new Date(b.next_action_date)).slice(0,60);
   const grp=x=>{const d=new Date(x.next_action_date); return d<t0?"🔥 متأخر":(d-t0<864e5?"اليوم":"قادم")};
   let cur=null;
-  $("tasks").innerHTML=list.length?list.map(x=>{
+  const silent=silentCustomers();
+  const silentHtml=silent.length?`<div class="sh-sec">🔕 عملاء صامتون — بلا توريدة +١٤ يوماً (خطر تسرب)</div>`
+    +silent.map(a=>`<div class="task late">
+      <div style="flex:1"><div class="tt">${esc(a.name_ar)}</div>
+        <div class="td">آخر توريدة: ${a.last_order_at?timeAgo(a.last_order_at):"لم تُسجَّل"}</div></div>
+      <div class="done acts">
+        <a class="btn b-call b-sm" href="tel:${digits(a.phone)}">اتصال</a>
+        <button class="btn b-wa b-sm" onclick="logOrder(${a.id});renderTasks()">📦 ورّدنا</button>
+      </div></div>`).join(""):"";
+  $("tasks").innerHTML=silentHtml+(list.length?list.map(x=>{
     const g=grp(x); const head=g!==cur?`<div class="sh-sec" style="margin-top:16px">${g}</div>`:""; cur=g;
     return head+taskRow(x)}).join("")
-    :`<div class="empty"><div class="big">✅</div>لا متابعات معلّقة — القائمة نظيفة</div>`;
+    :(silent.length?"":`<div class="empty"><div class="big">✅</div>لا متابعات معلّقة — القائمة نظيفة</div>`));
 }
+const isCustomer=a=>a.status==="customer"||DEALS.some(d=>d.account_id==a.id&&d.stage==="won");
+async function logOrder(id){
+  const a=accById(id); const now=new Date().toISOString();
+  try{
+    await api(`crm_accounts?id=eq.${id}`,{method:"PATCH",body:JSON.stringify({last_order_at:now})});
+    a.last_order_at=now;
+    const act={account_id:id,activity_type:"delivery",notes:"📦 توريدة"};
+    try{await api("crm_activities",{method:"POST",body:JSON.stringify(act)});ACTS.unshift({...act,created_at:now,created_by:ME?.id})}catch(e){}
+    closeSheet(); toast("سُجّلت التوريدة 📦");
+  }catch(e){toast("تعذر التسجيل: "+e.message)}}
+function silentCustomers(){
+  const th=14*864e5;
+  return ACC.filter(a=>isCustomer(a)&&isOpenAcc(a)&&(!a.last_order_at||(Date.now()-new Date(a.last_order_at))>th));}
 function taskRow(x){
   {
     const a=accById(x.account_id); const late=new Date(x.next_action_date)<today0();
@@ -798,6 +913,8 @@ async function mfaRemove(fid){
   catch(e){toast(e.message)}}
 /* ---- شاشة الإدارة ---- */
 async function renderAdmin(){
+  const sg=ACC.filter(a=>a.status==="suggested").length;
+  $("adminSub").innerHTML=`اعتمد المندوبين وأدر الأدوار${sg?` · <b style="color:var(--red)">⏳ ${sg} حساب مقترح بانتظارك</b> — من شاشة الحسابات ← فلتر «مقترحة»`:""}`;
   const us=await api("app_users?select=*&order=created_at.desc").catch(e=>{toast(e.message);return[]});
   const ROLE={admin:"مدير",rep:"مندوب"}, ST={pending:["بانتظار الاعتماد","t-lead"],approved:["معتمد","t-cust"],disabled:["موقوف","t-x"]};
   $("adminList").innerHTML=(us||[]).map(u=>{
