@@ -322,6 +322,7 @@ async function api(path, opts={}, retried){
 const AR_AUTH_ERR=m=>{
   if(/invalid login|invalid_credentials/i.test(m)) return "الإيميل أو كلمة المرور غير صحيحة";
   if(/email not confirmed/i.test(m)) return "أكّد إيميلك أولاً — افتح رسالة التأكيد في بريدك ثم ارجع سجّل دخول";
+  if(/friendly name|factor.*already exists/i.test(m)) return "يوجد تفعيل سابق غير مكتمل — أعد المحاولة الآن وسيُنظَّف تلقائياً";
   if(/already registered|user already exists/i.test(m)) return "الحساب موجود — استخدم زر الدخول";
   if(/at least 6|password should/i.test(m)) return "كلمة المرور قصيرة — 6 أحرف على الأقل";
   if(/rate limit|security purposes/i.test(m)) return "محاولات كثيرة — انتظر دقيقة وحاول";
@@ -712,7 +713,11 @@ async function openProfile(){
     <button class="btn b-ghost b-sm" onclick="logout()">تسجيل الخروج</button>`);}
 async function mfaEnroll(){
   try{
-    const d=await authPost("factors",{factor_type:"totp",friendly_name:"awan-crm"});
+    // تنظيف أي تفعيل سابق غير مكتمل
+    try{const u=await authGet("user");
+      for(const x of (u.factors||[]).filter(x=>x.status!=="verified")) await authDel(`factors/${x.id}`);
+    }catch(e){}
+    const d=await authPost("factors",{factor_type:"totp",friendly_name:"awan-"+Date.now()});
     openSheet(`<div class="sh-name">تفعيل التحقق الثنائي</div>
       <div class="sh-meta">امسح الرمز بتطبيق المصادقة ثم أدخل الرمز الظاهر فيه</div>
       <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;justify-content:center">${d.totp.qr_code}</div>
