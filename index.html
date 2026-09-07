@@ -335,6 +335,7 @@ async function api(path, opts={}, retried){
 }
 /* ---- مصادقة ---- */
 const AR_AUTH_ERR=m=>{
+  if(/failed to fetch|networkerror|network request failed|load failed/i.test(m)) return "تعذّر الوصول للخادم — حاول بعد دقيقة";
   if(/invalid login|invalid_credentials/i.test(m)) return "الإيميل أو كلمة المرور غير صحيحة";
   if(/email not confirmed/i.test(m)) return "أكّد إيميلك أولاً — افتح رسالة التأكيد في بريدك ثم ارجع سجّل دخول";
   if(/friendly name|factor.*already exists/i.test(m)) return "يوجد تفعيل سابق غير مكتمل — أعد المحاولة الآن وسيُنظَّف تلقائياً";
@@ -342,8 +343,12 @@ const AR_AUTH_ERR=m=>{
   if(/at least 6|password should/i.test(m)) return "كلمة المرور قصيرة — 6 أحرف على الأقل";
   if(/rate limit|security purposes/i.test(m)) return "محاولات كثيرة — انتظر دقيقة وحاول";
   return m;};
+/* fetch يرمي TypeError عند انقطاع الشبكة أو نوم الخادم — نمرّره عبر AR_AUTH_ERR ليصل بالعربي */
+async function authFetch(url, init){
+  try{return await fetch(url, init)}
+  catch(e){throw new Error(AR_AUTH_ERR(e.message||"failed to fetch"))}}
 async function authPost(path, body){
-  const r=await fetch(SB_URL+"/auth/v1/"+path,{method:"POST",
+  const r=await authFetch(SB_URL+"/auth/v1/"+path,{method:"POST",
     headers:{apikey:SB_ANON,Authorization:"Bearer "+(ACCESS||SB_ANON),"Content-Type":"application/json"},body:JSON.stringify(body)});
   const d=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(AR_AUTH_ERR(d.error_description||d.msg||d.message||JSON.stringify(d).slice(0,150)));
@@ -356,9 +361,9 @@ async function refreshSession(){
 function logout(){ACCESS="";REFRESH="";USER_EMAIL="";store.set("awan_rt","");location.reload();}
 let ME=null;
 const jwtPayload=t=>{try{return JSON.parse(atob(t.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")))}catch(e){return{}}};
-async function authGet(path){const r=await fetch(SB_URL+"/auth/v1/"+path,{headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS}});
+async function authGet(path){const r=await authFetch(SB_URL+"/auth/v1/"+path,{headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS}});
   const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(AR_AUTH_ERR(d.msg||d.error_description||"خطأ")); return d}
-async function authDel(path){const r=await fetch(SB_URL+"/auth/v1/"+path,{method:"DELETE",headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS}});
+async function authDel(path){const r=await authFetch(SB_URL+"/auth/v1/"+path,{method:"DELETE",headers:{apikey:SB_ANON,Authorization:"Bearer "+ACCESS}});
   if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(AR_AUTH_ERR(d.msg||"خطأ"))}}
 async function fetchMe(){const uid=jwtPayload(ACCESS).sub;
   const rows=await api(`app_users?select=*&id=eq.${uid}`); return rows?.[0]||null}
